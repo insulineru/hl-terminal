@@ -1,6 +1,10 @@
-# hl-terminal
+<p align="center">
+  <img src="assets/banner.svg" alt="hl-terminal — Hyperliquid DEX Terminal" width="100%" />
+</p>
 
-Hyperliquid DEX terminal — read market data, manage accounts, and execute trades from the command line or via AI agent (MCP).
+<p align="center">
+  Hyperliquid DEX terminal — read market data, manage accounts, and execute trades from the command line or via AI agent (MCP).
+</p>
 
 ## Features
 

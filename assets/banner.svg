@@ -1,0 +1,228 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" width="1280" height="640">
+  <defs>
+    <!-- Background gradient -->
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#04060C"/>
+      <stop offset="50%" stop-color="#06100E"/>
+      <stop offset="100%" stop-color="#04060C"/>
+    </linearGradient>
+
+    <!-- Aquamarine glow -->
+    <radialGradient id="glow" cx="50%" cy="55%" r="40%">
+      <stop offset="0%" stop-color="#97FCE4" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#97FCE4" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Secondary glow top-left -->
+    <radialGradient id="glow2" cx="20%" cy="25%" r="30%">
+      <stop offset="0%" stop-color="#97FCE4" stop-opacity="0.04"/>
+      <stop offset="100%" stop-color="#97FCE4" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Terminal window shadow -->
+    <filter id="termShadow" x="-5%" y="-5%" width="110%" height="115%">
+      <feDropShadow dx="0" dy="4" stdDeviation="20" flood-color="#97FCE4" flood-opacity="0.12"/>
+      <feDropShadow dx="0" dy="2" stdDeviation="40" flood-color="#97FCE4" flood-opacity="0.06"/>
+    </filter>
+
+    <!-- Terminal border glow -->
+    <filter id="borderGlow" x="-2%" y="-2%" width="104%" height="104%">
+      <feDropShadow dx="0" dy="0" stdDeviation="1" flood-color="#97FCE4" flood-opacity="0.3"/>
+    </filter>
+
+    <!-- Subtle grid pattern -->
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <circle cx="20" cy="20" r="0.5" fill="#97FCE4" opacity="0.08"/>
+    </pattern>
+
+    <!-- Scanline effect -->
+    <pattern id="scanlines" width="4" height="4" patternUnits="userSpaceOnUse">
+      <rect width="4" height="2" fill="#97FCE4" opacity="0.01"/>
+    </pattern>
+
+    <!-- Clip for terminal content -->
+    <clipPath id="termClip">
+      <rect x="158" y="198" width="964" height="352" rx="0"/>
+    </clipPath>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1280" height="640" fill="url(#bg)"/>
+  <rect width="1280" height="640" fill="url(#grid)"/>
+  <rect width="1280" height="640" fill="url(#glow)"/>
+  <rect width="1280" height="640" fill="url(#glow2)"/>
+  <rect width="1280" height="640" fill="url(#scanlines)"/>
+
+  <!-- Decorative lines -->
+  <line x1="0" y1="0" x2="300" y2="640" stroke="#97FCE4" stroke-opacity="0.03" stroke-width="1"/>
+  <line x1="200" y1="0" x2="500" y2="640" stroke="#97FCE4" stroke-opacity="0.02" stroke-width="1"/>
+  <line x1="980" y1="0" x2="1280" y2="640" stroke="#97FCE4" stroke-opacity="0.03" stroke-width="1"/>
+  <line x1="1080" y1="0" x2="780" y2="640" stroke="#97FCE4" stroke-opacity="0.02" stroke-width="1"/>
+
+  <!-- Title area -->
+  <text x="640" y="76" text-anchor="middle" fill="#97FCE4" font-family="'SF Mono', 'Fira Code', 'JetBrains Mono', 'Cascadia Code', monospace" font-size="14" letter-spacing="8" opacity="0.5">HYPERLIQUID DEX</text>
+
+  <!-- Main title -->
+  <text x="640" y="122" text-anchor="middle" fill="#F0FDFB" font-family="'Inter', 'SF Pro Display', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="42" font-weight="700" letter-spacing="-1">
+    <tspan fill="#97FCE4">hl</tspan><tspan fill="#F0FDFB" opacity="0.4">-</tspan><tspan fill="#F0FDFB" opacity="0.85">terminal</tspan>
+  </text>
+
+  <!-- Tagline -->
+  <text x="640" y="155" text-anchor="middle" fill="#97FCE4" font-family="'Inter', 'SF Pro Display', -apple-system, sans-serif" font-size="15" opacity="0.45" letter-spacing="0.5">Trade Hyperliquid from your terminal</text>
+
+  <!-- Terminal window -->
+  <g filter="url(#termShadow)">
+    <!-- Terminal body -->
+    <rect x="158" y="185" width="964" height="380" rx="12" fill="#0A0F14" stroke="#97FCE4" stroke-opacity="0.12" stroke-width="1"/>
+
+    <!-- Title bar -->
+    <rect x="158" y="185" width="964" height="38" rx="12" fill="#0D1318"/>
+    <rect x="158" y="211" width="964" height="12" fill="#0D1318"/>
+
+    <!-- Window buttons -->
+    <circle cx="184" cy="204" r="6" fill="#FF5F57" opacity="0.8"/>
+    <circle cx="206" cy="204" r="6" fill="#FFBD2E" opacity="0.8"/>
+    <circle cx="228" cy="204" r="6" fill="#28CA41" opacity="0.8"/>
+
+    <!-- Title bar text -->
+    <text x="640" y="209" text-anchor="middle" fill="#97FCE4" font-family="'SF Mono', 'Fira Code', monospace" font-size="12" opacity="0.4">hl — 80×24</text>
+
+    <!-- Separator line -->
+    <line x1="158" y1="223" x2="1122" y2="223" stroke="#97FCE4" stroke-opacity="0.08" stroke-width="1"/>
+  </g>
+
+  <!-- Terminal content -->
+  <g clip-path="url(#termClip)" font-family="'SF Mono', 'Fira Code', 'JetBrains Mono', 'Cascadia Code', Menlo, Monaco, 'Courier New', monospace" font-size="13.5">
+
+    <!-- Command 1: price -->
+    <text x="182" y="256">
+      <tspan fill="#97FCE4" opacity="0.5">$</tspan>
+      <tspan fill="#F0FDFB" opacity="0.9"> hl price BTC ETH SOL</tspan>
+    </text>
+
+    <text x="182" y="282" fill="#97FCE4" opacity="0.3" font-size="12">COIN          MID PRICE</text>
+    <text x="182" y="302">
+      <tspan fill="#F0FDFB" opacity="0.7">BTC </tspan>
+      <tspan fill="#97FCE4" dx="40">$97,284.50</tspan>
+    </text>
+    <text x="182" y="320">
+      <tspan fill="#F0FDFB" opacity="0.7">ETH </tspan>
+      <tspan fill="#97FCE4" dx="40"> $3,842.18</tspan>
+    </text>
+    <text x="182" y="338">
+      <tspan fill="#F0FDFB" opacity="0.7">SOL </tspan>
+      <tspan fill="#97FCE4" dx="40">   $189.32</tspan>
+    </text>
+
+    <!-- Divider -->
+    <line x1="182" y1="356" x2="480" y2="356" stroke="#97FCE4" stroke-opacity="0.06" stroke-width="1"/>
+
+    <!-- Command 2: positions -->
+    <text x="182" y="378">
+      <tspan fill="#97FCE4" opacity="0.5">$</tspan>
+      <tspan fill="#F0FDFB" opacity="0.9"> hl positions</tspan>
+    </text>
+
+    <text x="182" y="404" fill="#97FCE4" opacity="0.3" font-size="12">COIN    SIZE       ENTRY       PNL          LIQ.PRICE    LEV</text>
+    <text x="182" y="424">
+      <tspan fill="#F0FDFB" opacity="0.7">ETH     </tspan>
+      <tspan fill="#97FCE4">+2.500     </tspan>
+      <tspan fill="#F0FDFB" opacity="0.5">$3,780.00   </tspan>
+      <tspan fill="#4ADE80">+$155.45     </tspan>
+      <tspan fill="#F0FDFB" opacity="0.4">$3,024.00    </tspan>
+      <tspan fill="#FFBD2E" opacity="0.7">5x</tspan>
+    </text>
+    <text x="182" y="444">
+      <tspan fill="#F0FDFB" opacity="0.7">SOL     </tspan>
+      <tspan fill="#FF6B6B">-15.00     </tspan>
+      <tspan fill="#F0FDFB" opacity="0.5">$195.40     </tspan>
+      <tspan fill="#4ADE80">+$91.20      </tspan>
+      <tspan fill="#F0FDFB" opacity="0.4">$234.48      </tspan>
+      <tspan fill="#FFBD2E" opacity="0.7">3x</tspan>
+    </text>
+    <text x="182" y="464">
+      <tspan fill="#F0FDFB" opacity="0.7">BTC     </tspan>
+      <tspan fill="#97FCE4">+0.100     </tspan>
+      <tspan fill="#F0FDFB" opacity="0.5">$97,500.00  </tspan>
+      <tspan fill="#FF6B6B">-$21.55      </tspan>
+      <tspan fill="#F0FDFB" opacity="0.4">$78,000.00   </tspan>
+      <tspan fill="#FFBD2E" opacity="0.7">2x</tspan>
+    </text>
+
+    <!-- Divider -->
+    <line x1="182" y1="482" x2="480" y2="482" stroke="#97FCE4" stroke-opacity="0.06" stroke-width="1"/>
+
+    <!-- Command 3: balance -->
+    <text x="182" y="504">
+      <tspan fill="#97FCE4" opacity="0.5">$</tspan>
+      <tspan fill="#F0FDFB" opacity="0.9"> hl balance</tspan>
+    </text>
+
+    <text x="182" y="530">
+      <tspan fill="#F0FDFB" opacity="0.5">Perps margin  </tspan>
+      <tspan fill="#97FCE4">$12,847.32</tspan>
+    </text>
+    <text x="182" y="548">
+      <tspan fill="#F0FDFB" opacity="0.5">Spot wallet   </tspan>
+      <tspan fill="#97FCE4"> $5,420.00</tspan>
+    </text>
+
+    <!-- Blinking cursor -->
+    <rect x="182" y="566" width="8" height="16" fill="#97FCE4" opacity="0.7">
+      <animate attributeName="opacity" values="0.7;0;0.7" dur="1.2s" repeatCount="indefinite"/>
+    </rect>
+
+    <!-- Right side: Feature badges -->
+    <g transform="translate(720, 250)">
+      <!-- MCP badge -->
+      <rect x="0" y="0" width="90" height="26" rx="5" fill="#97FCE4" fill-opacity="0.08" stroke="#97FCE4" stroke-opacity="0.2" stroke-width="1"/>
+      <text x="45" y="17" text-anchor="middle" fill="#97FCE4" font-size="11" opacity="0.7">MCP</text>
+
+      <!-- JSON badge -->
+      <rect x="100" y="0" width="90" height="26" rx="5" fill="#97FCE4" fill-opacity="0.08" stroke="#97FCE4" stroke-opacity="0.2" stroke-width="1"/>
+      <text x="145" y="17" text-anchor="middle" fill="#97FCE4" font-size="11" opacity="0.7">JSON</text>
+
+      <!-- Testnet badge -->
+      <rect x="200" y="0" width="90" height="26" rx="5" fill="#97FCE4" fill-opacity="0.08" stroke="#97FCE4" stroke-opacity="0.2" stroke-width="1"/>
+      <text x="245" y="17" text-anchor="middle" fill="#97FCE4" font-size="11" opacity="0.7">Testnet</text>
+
+      <!-- Feature list -->
+      <text x="0" y="60" fill="#97FCE4" opacity="0.25" font-size="11">FEATURES</text>
+
+      <text x="0" y="86">
+        <tspan fill="#97FCE4" opacity="0.4" font-size="12">&#x25B8;</tspan>
+        <tspan fill="#F0FDFB" opacity="0.55" font-size="12.5" dx="6">Market data &amp; prices</tspan>
+      </text>
+      <text x="0" y="108">
+        <tspan fill="#97FCE4" opacity="0.4" font-size="12">&#x25B8;</tspan>
+        <tspan fill="#F0FDFB" opacity="0.55" font-size="12.5" dx="6">Positions &amp; orders</tspan>
+      </text>
+      <text x="0" y="130">
+        <tspan fill="#97FCE4" opacity="0.4" font-size="12">&#x25B8;</tspan>
+        <tspan fill="#F0FDFB" opacity="0.55" font-size="12.5" dx="6">Account management</tspan>
+      </text>
+      <text x="0" y="152">
+        <tspan fill="#97FCE4" opacity="0.4" font-size="12">&#x25B8;</tspan>
+        <tspan fill="#F0FDFB" opacity="0.55" font-size="12.5" dx="6">Funding rates &amp; fills</tspan>
+      </text>
+      <text x="0" y="174">
+        <tspan fill="#97FCE4" opacity="0.4" font-size="12">&#x25B8;</tspan>
+        <tspan fill="#F0FDFB" opacity="0.55" font-size="12.5" dx="6">AI agent integration</tspan>
+      </text>
+
+      <!-- Install hint -->
+      <rect x="0" y="210" width="290" height="36" rx="6" fill="#97FCE4" fill-opacity="0.05" stroke="#97FCE4" stroke-opacity="0.12" stroke-width="1"/>
+      <text x="145" y="233" text-anchor="middle" fill="#97FCE4" font-size="12.5" opacity="0.6">bun add -g hl-terminal</text>
+    </g>
+
+  </g>
+
+  <!-- Bottom bar -->
+  <text x="640" y="606" text-anchor="middle" fill="#97FCE4" font-family="'Inter', -apple-system, sans-serif" font-size="12" opacity="0.2" letter-spacing="0.5">github.com/insulineru/hyperliquid-cli</text>
+
+  <!-- Version badge -->
+  <g transform="translate(1100, 594)">
+    <rect x="0" y="0" width="48" height="20" rx="4" fill="#97FCE4" fill-opacity="0.06" stroke="#97FCE4" stroke-opacity="0.15" stroke-width="0.5"/>
+    <text x="24" y="14" text-anchor="middle" fill="#97FCE4" font-family="'SF Mono', monospace" font-size="10" opacity="0.35">v0.2</text>
+  </g>
+</svg>
