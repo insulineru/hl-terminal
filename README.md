@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/banner.svg" alt="hl-terminal — Hyperliquid DEX Terminal" width="100%" />
+  <img src="assets/banner.png" alt="hl-terminal — Hyperliquid DEX Terminal" width="100%" />
 </p>
 
 <p align="center">
