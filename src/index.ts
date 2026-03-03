@@ -19,8 +19,8 @@ const vars = z.object({
   testnet: z.boolean().default(false),
 })
 
-const cli = Cli.create('hl', {
-  version: '0.2.0',
+const cli = Cli.create('hl-terminal', {
+  version: '0.2.2',
   description:
     'Hyperliquid DEX trading CLI — read market state, manage accounts, and execute trades from the terminal or via AI agent (MCP)',
   options: z.object({

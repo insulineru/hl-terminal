@@ -22,7 +22,7 @@
   },
   "[!start-pkg]": "",
   "name": "hl-terminal",
-  "version": "0.2.0",
+  "version": "0.2.2",
   "description": "Hyperliquid DEX terminal — read market data, manage accounts, and execute trades from the command line or via AI agent (MCP)",
   "type": "module",
   "license": "MIT",
@@ -36,7 +36,7 @@
     "url": "https://github.com/insulineru/hyperliquid-cli/issues"
   },
   "bin": {
-    "hl.src": "./src/index.ts"
+    "hl-terminal": "./src/index.ts"
   },
   "main": "./dist/index.js",
   "exports": {
@@ -46,7 +46,10 @@
       "default": "./dist/index.js"
     }
   },
-  "files": ["dist", "src"],
+  "files": [
+    "dist",
+    "src"
+  ],
   "keywords": [
     "hyperliquid",
     "dex",

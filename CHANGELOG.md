@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.2
+
+### Patch Changes
+
+- Fix CLI binary name — remove `.src` suffix so users get `hl-terminal` command
+
+## 0.2.1
+
+### Patch Changes
+
+- Rename CLI binary from `hl` to `hl-terminal` to avoid conflicts with other packages
+
 ## 0.2.0
 
 ### Minor Changes

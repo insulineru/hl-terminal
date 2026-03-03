@@ -28,19 +28,19 @@ npm install -g hl-terminal
 
 ```bash
 # Add your first account
-hl account add --name main
+hl-terminal account add --name main
 
 # Check BTC price
-hl price BTC
+hl-terminal price BTC
 
 # View your positions
-hl positions
+hl-terminal positions
 
 # View your balance
-hl balance
+hl-terminal balance
 
 # List available markets
-hl markets
+hl-terminal markets
 ```
 
 ## Commands
@@ -49,23 +49,23 @@ hl markets
 
 | Command                              | Description                           |
 | ------------------------------------ | ------------------------------------- |
-| `hl account add --name <n>`          | Add account (prompts for private key) |
-| `hl account watch <addr> --name <n>` | Add read-only account (address only)  |
-| `hl account ls`                      | List all accounts                     |
-| `hl account rm <name>`               | Remove an account                     |
-| `hl account switch <name>`           | Switch default account                |
+| `hl-terminal account add --name <n>`          | Add account (prompts for private key) |
+| `hl-terminal account watch <addr> --name <n>` | Add read-only account (address only)  |
+| `hl-terminal account ls`                      | List all accounts                     |
+| `hl-terminal account rm <name>`               | Remove an account                     |
+| `hl-terminal account switch <name>`           | Switch default account                |
 
 ### Market Data
 
 | Command             | Description                                  |
 | ------------------- | -------------------------------------------- |
-| `hl price <coin>`   | Current mid-price for a coin                 |
-| `hl balance`        | Perps margin + spot wallet balance           |
-| `hl positions`      | Open positions with PnL, leverage, liq price |
-| `hl orders`         | Open orders with side, size, price, type     |
-| `hl markets`        | Available markets with metadata              |
-| `hl funding [coin]` | Current funding rates or history for a coin  |
-| `hl fills [coin]`   | Trade history with time range and pagination |
+| `hl-terminal price <coin>`   | Current mid-price for a coin                 |
+| `hl-terminal balance`        | Perps margin + spot wallet balance           |
+| `hl-terminal positions`      | Open positions with PnL, leverage, liq price |
+| `hl-terminal orders`         | Open orders with side, size, price, type     |
+| `hl-terminal markets`        | Available markets with metadata              |
+| `hl-terminal funding [coin]` | Current funding rates or history for a coin  |
+| `hl-terminal fills [coin]`   | Trade history with time range and pagination |
 
 ### Global Options
 
@@ -83,7 +83,7 @@ hl markets
 hl-terminal works as an [MCP](https://modelcontextprotocol.io) server for AI agents:
 
 ```bash
-hl --mcp
+hl-terminal --mcp
 ```
 
 All commands are exposed as tools that AI agents can call programmatically.
