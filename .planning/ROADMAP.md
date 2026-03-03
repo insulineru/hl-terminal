@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Foundation** - Account management, all read commands, and agent integration wired in from day one (2026-03-03)
 - [x] **Phase 1.5: Developer Experience** - INSERTED: oxlint, oxfmt, changesets, zile build, and knip wired in for a wevm-style DX before feature work continues (2026-03-03)
-- [ ] **Phase 2: Trade Execution** - Full order lifecycle — place, cancel, leverage, TP/SL — on top of the validated foundation
+- [x] **Phase 2: Trade Execution** - Full order lifecycle — place, cancel, leverage, TP/SL — on top of the validated foundation (2026-03-04)
 - [ ] **Phase 3: Live Streaming** - WebSocket watch mode for real-time position and P&L updates
 
 ## Phase Details
@@ -80,7 +80,7 @@ Plans:
 
 - [x] 02-01-PLAN.md — ExchangeClient middleware, asset resolution, and SDK precision utilities (2026-03-04)
 - [x] 02-02-PLAN.md — Order commands (`hl order create`, `hl order cancel`, `hl order cancel-all`) (2026-03-04)
-- [ ] 02-03-PLAN.md — Position management commands (`hl position leverage`, `hl position tp`, `hl position sl`)
+- [x] 02-03-PLAN.md — Position management commands (`hl position leverage`, `hl position tp`, `hl position sl`) (2026-03-04)
 
 ### Phase 3: Live Streaming
 
@@ -107,5 +107,5 @@ Phases execute in numeric order: 1 -> 1.5 -> 2 -> 3
 | ------------------------- | -------------- | ----------- | ---------- |
 | 1. Foundation             | 5/5            | Complete    | 2026-03-03 |
 | 1.5. Developer Experience | 3/3            | Complete    | 2026-03-03 |
-| 2. Trade Execution        | 2/3            | In progress | -          |
+| 2. Trade Execution        | 3/3            | Complete    | 2026-03-04 |
 | 3. Live Streaming         | 0/1            | Not started | -          |
