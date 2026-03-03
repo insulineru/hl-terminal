@@ -85,7 +85,7 @@
     <circle cx="228" cy="204" r="6" fill="#28CA41" opacity="0.8"/>
 
     <!-- Title bar text -->
-    <text x="640" y="209" text-anchor="middle" fill="#97FCE4" font-family="'SF Mono', 'Fira Code', monospace" font-size="12" opacity="0.4">hl — 80×24</text>
+    <text x="640" y="209" text-anchor="middle" fill="#97FCE4" font-family="'SF Mono', 'Fira Code', monospace" font-size="12" opacity="0.4">hl-terminal — 80×24</text>
 
     <!-- Separator line -->
     <line x1="158" y1="223" x2="1122" y2="223" stroke="#97FCE4" stroke-opacity="0.08" stroke-width="1"/>
@@ -97,7 +97,7 @@
     <!-- Command 1: price -->
     <text x="182" y="256">
       <tspan fill="#97FCE4" opacity="0.5">$</tspan>
-      <tspan fill="#F0FDFB" opacity="0.9"> hl price BTC ETH SOL</tspan>
+      <tspan fill="#F0FDFB" opacity="0.9"> hl-terminal price BTC ETH SOL</tspan>
     </text>
 
     <text x="182" y="282" fill="#97FCE4" opacity="0.3" font-size="12">COIN          MID PRICE</text>
@@ -120,7 +120,7 @@
     <!-- Command 2: positions -->
     <text x="182" y="378">
       <tspan fill="#97FCE4" opacity="0.5">$</tspan>
-      <tspan fill="#F0FDFB" opacity="0.9"> hl positions</tspan>
+      <tspan fill="#F0FDFB" opacity="0.9"> hl-terminal positions</tspan>
     </text>
 
     <text x="182" y="404" fill="#97FCE4" opacity="0.3" font-size="12">COIN    SIZE       ENTRY       PNL          LIQ.PRICE    LEV</text>
@@ -155,7 +155,7 @@
     <!-- Command 3: balance -->
     <text x="182" y="504">
       <tspan fill="#97FCE4" opacity="0.5">$</tspan>
-      <tspan fill="#F0FDFB" opacity="0.9"> hl balance</tspan>
+      <tspan fill="#F0FDFB" opacity="0.9"> hl-terminal balance</tspan>
     </text>
 
     <text x="182" y="530">
@@ -218,7 +218,7 @@
   </g>
 
   <!-- Bottom bar -->
-  <text x="640" y="606" text-anchor="middle" fill="#97FCE4" font-family="'Inter', -apple-system, sans-serif" font-size="12" opacity="0.2" letter-spacing="0.5">github.com/insulineru/hyperliquid-cli</text>
+  <text x="640" y="606" text-anchor="middle" fill="#97FCE4" font-family="'Inter', -apple-system, sans-serif" font-size="12" opacity="0.2" letter-spacing="0.5">github.com/insulineru/hl-terminal</text>
 
   <!-- Version badge -->
   <g transform="translate(1100, 594)">

@@ -17,7 +17,7 @@ hl-terminal stores account credentials locally at `~/.hyperliquid/config.json` w
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability, please report it through [GitHub Security Advisories](https://github.com/insulineru/hyperliquid-cli/security/advisories/new).
+If you discover a security vulnerability, please report it through [GitHub Security Advisories](https://github.com/insulineru/hl-terminal/security/advisories/new).
 
 **Do not open a public issue for security vulnerabilities.**
 

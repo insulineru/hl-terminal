@@ -9,8 +9,8 @@ Thanks for your interest in contributing to hl-terminal! Every contribution help
 ## Getting Started
 
 ```bash
-git clone https://github.com/insulineru/hyperliquid-cli.git
-cd hyperliquid-cli
+git clone https://github.com/insulineru/hl-terminal.git
+cd hl-terminal
 bun install
 ```
 
