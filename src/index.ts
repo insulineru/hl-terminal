@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { Cli, z, middleware } from 'incur'
 import { loadActiveAccount } from './lib/config.js'
-import { createInfoClient } from './lib/client.js'
+import { createInfoClient, createExchangeClient } from './lib/client.js'
 import { account } from './commands/account.js'
 import { price } from './commands/price.js'
 import { balance } from './commands/balance.js'
@@ -14,6 +14,7 @@ import { fills } from './commands/fills.js'
 // Vars schema for middleware injection
 const vars = z.object({
   info: z.any().optional(),
+  exchange: z.any().optional(),
   address: z.string().optional(),
   account: z.any().optional(),
   testnet: z.boolean().default(false),
@@ -64,6 +65,12 @@ cli.use(
     c.set('info', info)
     c.set('address', acct.address)
     c.set('account', acct)
+
+    // Create ExchangeClient only for accounts with a private key (not watch-only)
+    if (acct.privateKey) {
+      const exchange = createExchangeClient(acct.privateKey, isTestnet)
+      c.set('exchange', exchange)
+    }
 
     await next()
   }),
