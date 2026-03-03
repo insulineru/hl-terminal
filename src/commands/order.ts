@@ -11,9 +11,9 @@ order.command('create', {
     coin: z.string().describe('Coin symbol (BTC, ETH)'),
     side: z.enum(['buy', 'sell']).describe('Order side'),
     size: z.string().describe('Order size in base currency units'),
+    price: z.string().optional().describe('Limit price — omit for market order'),
   }),
   options: z.object({
-    price: z.string().optional().describe('Limit price (omit for market order)'),
     tif: z.enum(['GTC', 'IOC', 'ALO']).default('GTC').describe('Time-in-force for limit orders'),
     slippage: z.number().default(3).describe('Slippage tolerance % for market orders'),
     reduceOnly: z.boolean().default(false).describe('Reduce-only flag'),
@@ -21,6 +21,19 @@ order.command('create', {
     sl: z.string().optional().describe('Inline stop-loss trigger price'),
     dryRun: z.boolean().default(false).describe('Preview without executing'),
   }),
+  examples: [
+    {
+      args: { coin: 'BTC', side: 'buy', size: '0.001', price: '95000' },
+      description: 'Limit buy 0.001 BTC at $95,000',
+    },
+    { args: { coin: 'ETH', side: 'sell', size: '1.5' }, description: 'Market sell 1.5 ETH' },
+    {
+      args: { coin: 'BTC', side: 'buy', size: '0.01' },
+      options: { tp: '100000', sl: '90000' },
+      description: 'Market buy with TP/SL',
+    },
+  ],
+  hint: 'Omit [price] for a market order. Include it for a limit order.',
   alias: { reduceOnly: 'r', dryRun: 'd' },
   output: z.object({
     dryRun: z.boolean(),
@@ -75,10 +88,10 @@ order.command('create', {
     let orderType: string
     let tifStr: 'Gtc' | 'Ioc' | 'Alo' | 'FrontendMarket'
 
-    if (c.options.price !== undefined) {
+    if (c.args.price !== undefined) {
       // Limit order
       orderType = 'limit'
-      formattedPrice = formatPrice(c.options.price, szDecimals, 'perp')
+      formattedPrice = formatPrice(c.args.price!, szDecimals, 'perp')
       const tifMap: Record<string, 'Gtc' | 'Ioc' | 'Alo'> = {
         GTC: 'Gtc',
         IOC: 'Ioc',

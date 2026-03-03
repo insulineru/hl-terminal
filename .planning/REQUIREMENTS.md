@@ -30,9 +30,9 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **TRAD-02**: User can place a market order with side, size, coin, and optional slippage tolerance
 - [x] **TRAD-03**: User can cancel an order by order ID
 - [x] **TRAD-04**: User can cancel all open orders with optional coin filter
-- [ ] **TRAD-05**: User can set leverage for a coin (value + cross/isolated mode)
-- [ ] **TRAD-06**: User can place a take-profit order with trigger price
-- [ ] **TRAD-07**: User can place a stop-loss order with trigger price
+- [x] **TRAD-05**: User can set leverage for a coin (value + cross/isolated mode)
+- [x] **TRAD-06**: User can place a take-profit order with trigger price
+- [x] **TRAD-07**: User can place a stop-loss order with trigger price
 
 ### Agent Integration
 
@@ -126,9 +126,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TRAD-02     | Phase 2   | Complete |
 | TRAD-03     | Phase 2   | Complete |
 | TRAD-04     | Phase 2   | Complete |
-| TRAD-05     | Phase 2   | Pending  |
-| TRAD-06     | Phase 2   | Pending  |
-| TRAD-07     | Phase 2   | Pending  |
+| TRAD-05     | Phase 2   | Complete |
+| TRAD-06     | Phase 2   | Complete |
+| TRAD-07     | Phase 2   | Complete |
 | LIVE-01     | Phase 3   | Pending  |
 | DX-01       | Phase 1.5 | Complete |
 | DX-02       | Phase 1.5 | Complete |
@@ -145,4 +145,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 ---
 
 _Requirements defined: 2026-03-03_
-_Last updated: 2026-03-04 — TRAD-01, TRAD-02, TRAD-03, TRAD-04 completed by Plan 02-02_
+_Last updated: 2026-03-04 — TRAD-01–TRAD-04 completed by Plan 02-02, TRAD-05–TRAD-07 completed by Plan 02-03_
