@@ -10,6 +10,8 @@ import { orders } from './commands/orders.js'
 import { markets } from './commands/markets.js'
 import { funding } from './commands/funding.js'
 import { fills } from './commands/fills.js'
+import { order } from './commands/order.js'
+import { position } from './commands/position.js'
 
 // Vars schema for middleware injection
 const vars = z.object({
@@ -85,6 +87,8 @@ cli.command('orders', orders)
 cli.command('markets', markets)
 cli.command('funding', funding)
 cli.command('fills', fills)
+cli.command(order)
+cli.command(position)
 
 cli.serve()
 

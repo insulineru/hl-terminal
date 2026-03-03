@@ -15,7 +15,10 @@ export function createInfoClient(isTestnet: boolean = false): InfoClient {
  * Create an ExchangeClient configured for the correct network.
  * Requires a private key for signing trade transactions.
  */
-export function createExchangeClient(privateKey: string, isTestnet: boolean = false): ExchangeClient {
+export function createExchangeClient(
+  privateKey: string,
+  isTestnet: boolean = false,
+): ExchangeClient {
   const transport = new HttpTransport({ isTestnet })
   const wallet = privateKeyToAccount(privateKey as Hex)
   return new ExchangeClient({ transport, wallet })
