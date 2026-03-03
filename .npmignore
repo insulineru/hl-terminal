@@ -1,0 +1,23 @@
+# Test files
+src/**/*.test.ts
+
+# Development and planning
+.planning/
+.claude/
+.codex/
+.changeset/
+.github/
+
+# Config files not needed in published package
+.oxlintrc.json
+.oxfmtrc.jsonc
+knip.json
+tsconfig.json
+tsconfig.tsbuildinfo
+
+# Editor and OS
+.DS_Store
+.idea/
+
+# Git
+.gitignore

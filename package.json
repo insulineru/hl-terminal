@@ -1,0 +1,68 @@
+{
+  "scripts": {
+    "build": "zile",
+    "changeset": "changeset",
+    "changeset:version": "changeset version",
+    "check": "oxlint --fix --ignore-pattern package.json && oxfmt src/",
+    "check:types": "tsc -b",
+    "dev": "zile dev",
+    "knip": "knip",
+    "release": "zile publish:prepare && changeset publish && zile publish:post",
+    "start": "bun run src/index.ts",
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.30.0",
+    "@types/bun": "^1.3.10",
+    "knip": "^5.85.0",
+    "oxfmt": "^0.35.0",
+    "oxlint": "^1.50.0",
+    "typescript": "^5.9.3",
+    "zile": "^0.0.22"
+  },
+  "[!start-pkg]": "",
+  "name": "hl-terminal",
+  "version": "0.2.0",
+  "description": "Hyperliquid DEX terminal — read market data, manage accounts, and execute trades from the command line or via AI agent (MCP)",
+  "type": "module",
+  "license": "MIT",
+  "author": "insulineru",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/insulineru/hyperliquid-cli.git"
+  },
+  "homepage": "https://github.com/insulineru/hyperliquid-cli#readme",
+  "bugs": {
+    "url": "https://github.com/insulineru/hyperliquid-cli/issues"
+  },
+  "bin": {
+    "hl.src": "./src/index.ts"
+  },
+  "main": "./dist/index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "src": "./src/index.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "src"],
+  "keywords": [
+    "hyperliquid",
+    "dex",
+    "trading",
+    "cli",
+    "terminal",
+    "crypto",
+    "defi",
+    "perpetuals"
+  ],
+  "engines": {
+    "bun": ">=1.0.0"
+  },
+  "dependencies": {
+    "@nktkas/hyperliquid": "^0.32.1",
+    "incur": "^0.1.12",
+    "viem": "^2.46.3"
+  }
+}

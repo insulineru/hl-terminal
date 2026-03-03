@@ -1,0 +1,39 @@
+name: Feature Request
+description: Suggest a new command or enhancement
+labels: ['enhancement']
+body:
+  - type: checkboxes
+    attributes:
+      label: Check existing issues
+      options:
+        - label: I checked there isn't already an issue or discussion for this feature.
+          required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the feature
+      description: What would you like to be added?
+    validations:
+      required: true
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use case
+      description: Why do you need this feature? What problem does it solve?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      options:
+        - New command
+        - Enhancement to existing command
+        - MCP / Agent integration
+        - Developer experience
+        - Other
+    validations:
+      required: true
