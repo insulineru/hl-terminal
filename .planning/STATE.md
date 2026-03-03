@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: completed
-stopped_at: Completed 02-03-PLAN.md
-last_updated: "2026-03-03T23:02:20.288Z"
+stopped_at: Completed 02-04-PLAN.md
+last_updated: "2026-03-03T23:47:44.579Z"
 last_activity: 2026-03-04 — Plan 02-03 executed (position leverage/tp/sl commands, trigger orders, auto-detect position direction)
 progress:
   total_phases: 4
   completed_phases: 3
-  total_plans: 11
-  completed_plans: 11
+  total_plans: 12
+  completed_plans: 12
   percent: 100
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-03)
 
 **Core value:** Traders can read market state and execute trades on Hyperliquid from the terminal or through an AI agent, with minimal latency and zero friction.
-**Current focus:** Phase 2 Trade Execution — COMPLETE (3/3 plans done)
+**Current focus:** Phase 2 Trade Execution — COMPLETE (4/4 plans done)
 
 ## Current Position
 
 Phase: 2 of 4 (Trade Execution) — COMPLETE
-Plan: 3 of 3 in current phase (02-01, 02-02, 02-03 complete)
-Status: Plan 02-03 complete — position leverage/tp/sl commands, clearinghouseState auto-detection, trigger orders
-Last activity: 2026-03-04 — Plan 02-03 executed (position leverage/tp/sl commands, trigger orders, auto-detect position direction)
+Plan: 4 of 4 in current phase (02-01, 02-02, 02-03, 02-04 complete)
+Status: Plan 02-04 complete — UAT gaps closed: price as positional arg, examples/hint added, README updated
+Last activity: 2026-03-04 — Plan 02-04 executed (price positional arg, order create examples/hint, README Phase 2 docs)
 
 Progress: [##########] 100% (Phase 1) | [##########] 100% (Phase 1.5) | [##########] 100% (Phase 2)
 
@@ -46,11 +46,11 @@ Progress: [##########] 100% (Phase 1) | [##########] 100% (Phase 1.5) | [#######
 | ------------------------- | ----- | ------- | -------- |
 | 1. Foundation             | 5     | ~55 min | ~11 min  |
 | 1.5. Developer Experience | 3/3   | ~23 min | ~8 min   |
-| 2. Trade Execution        | 3/3   | ~12 min | ~4 min   |
+| 2. Trade Execution        | 4/4   | ~17 min | ~4 min   |
 
 **Recent Trend:**
 
-- Last 10 plans: 01-02 (12m), 01-03 (10m), 01-04 (10m), 01-05 (15m), 01.5-01 (14m), 01.5-02 (5m), 01.5-03 (4m), 02-01 (6m), 02-02 (3m), 02-03 (3m)
+- Last 10 plans: 01-02 (12m), 01-03 (10m), 01-04 (10m), 01-05 (15m), 01.5-01 (14m), 01.5-02 (5m), 01.5-03 (4m), 02-01 (6m), 02-02 (3m), 02-03 (3m), 02-04 (5m)
 - Trend: Consistent execution pace
 
 _Updated after each plan completion_
@@ -92,6 +92,8 @@ Recent decisions affecting current work:
 - [Plan 02-03]: placeTriggerOrder() shared helper for tp and sl commands — avoids duplicating 80+ lines of position detection, direction logic, order execution
 - [Plan 02-03]: s: '0' with grouping 'positionTpsl' scales triggers with position size — matches Hyperliquid frontend behavior
 - [Plan 02-03]: Trigger price validated against allMids() before dry-run check — surface input errors eagerly
+- [Phase 02-04]: price as positional arg (not --price flag): matches natural CLI conventions for trading (hl order create BTC buy 0.001 95000)
+- [Phase 02-04]: examples/hint fields on order create command definition: incur renders on --help and validation errors for self-correcting UX
 
 ### Pending Todos
 
@@ -104,7 +106,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-04T22:55:18Z
-Stopped at: Completed 02-03-PLAN.md
-Resume file: .planning/phases/02-trade-execution/02-03-SUMMARY.md
+Last session: 2026-03-03T23:47:44.577Z
+Stopped at: Completed 02-04-PLAN.md
+Resume file: .planning/phases/02-trade-execution/02-04-SUMMARY.md
 Next action: Phase 2 complete — ready to begin Phase 3 (live streaming: hl positions -w with WebSocket watch mode)
