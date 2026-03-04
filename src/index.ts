@@ -68,10 +68,16 @@ cli.use(
     c.set('address', acct.address)
     c.set('account', acct)
 
-    // Create ExchangeClient only for accounts with a private key (not watch-only)
+    // Lazily create ExchangeClient only when first accessed (avoids crypto overhead for read-only commands)
     if (acct.privateKey) {
-      const exchange = createExchangeClient(acct.privateKey, isTestnet)
-      c.set('exchange', exchange)
+      let _exchange: ReturnType<typeof createExchangeClient> | undefined
+      const exchangeProxy = new Proxy({} as ReturnType<typeof createExchangeClient>, {
+        get(_, prop) {
+          if (!_exchange) _exchange = createExchangeClient(acct.privateKey!, isTestnet)
+          return (_exchange as any)[prop]
+        },
+      })
+      c.set('exchange', exchangeProxy)
     }
 
     await next()

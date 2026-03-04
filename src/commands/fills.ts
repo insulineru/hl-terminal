@@ -1,4 +1,5 @@
 import { z } from 'incur'
+import { formatSide } from '../lib/exchange.js'
 
 export const fills = {
   description:
@@ -54,7 +55,7 @@ export const fills = {
     const result = capped.map((f: any) => ({
       time: new Date(f.time).toISOString().replace('T', ' ').slice(0, 19),
       coin: f.coin ?? '',
-      side: f.side === 'B' ? 'Buy' : f.side === 'A' ? 'Sell' : (f.side ?? ''),
+      side: formatSide(f.side ?? ''),
       size: f.sz ?? '0',
       price: f.px ?? '0',
       fee: f.fee ?? '0',

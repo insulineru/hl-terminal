@@ -1,5 +1,20 @@
 import { Cli, z } from 'incur'
-import { resolveAsset, formatPrice, formatSize } from '../lib/exchange.js'
+import {
+  resolveAsset,
+  buildAssetMap,
+  formatPrice,
+  formatSize,
+  formatSide,
+  errorMessage,
+  parseOrderStatus,
+  requireExchange,
+} from '../lib/exchange.js'
+
+const TIF_MAP: Record<string, 'Gtc' | 'Ioc' | 'Alo'> = {
+  GTC: 'Gtc',
+  IOC: 'Ioc',
+  ALO: 'Alo',
+}
 
 export const order = Cli.create('order', {
   description: 'Place and manage orders',
@@ -52,21 +67,11 @@ order.command('create', {
     slStatus: z.string().optional(),
   }),
   async run(c: any) {
-    // Guard: read-only account cannot place orders
-    if (!c.var.exchange) {
-      return c.error({
-        code: 'READ_ONLY_ACCOUNT',
-        message: 'This account has no private key and cannot place orders',
-        cta: {
-          commands: [{ command: 'account add --name main', description: 'Add a trading account' }],
-          description: 'Get started:',
-        },
-      })
-    }
+    const guard = requireExchange(c, 'place orders')
+    if (guard) return guard
 
     const coin = c.args.coin.toUpperCase()
 
-    // Resolve asset
     let assetId: number
     let szDecimals: number
     try {
@@ -74,10 +79,7 @@ order.command('create', {
       assetId = resolved.assetId
       szDecimals = resolved.szDecimals
     } catch (err) {
-      return c.error({
-        code: 'ASSET_NOT_FOUND',
-        message: err instanceof Error ? err.message : String(err),
-      })
+      return c.error({ code: 'ASSET_NOT_FOUND', message: errorMessage(err) })
     }
 
     const formattedSize = formatSize(c.args.size, szDecimals)
@@ -92,12 +94,7 @@ order.command('create', {
       // Limit order
       orderType = 'limit'
       formattedPrice = formatPrice(c.args.price!, szDecimals, 'perp')
-      const tifMap: Record<string, 'Gtc' | 'Ioc' | 'Alo'> = {
-        GTC: 'Gtc',
-        IOC: 'Ioc',
-        ALO: 'Alo',
-      }
-      tifStr = tifMap[c.options.tif] ?? 'Gtc'
+      tifStr = TIF_MAP[c.options.tif] ?? 'Gtc'
     } else {
       // Market order — fetch mid price and apply slippage
       orderType = 'market'
@@ -109,16 +106,13 @@ order.command('create', {
       } catch (err) {
         return c.error({
           code: 'PRICE_FETCH_FAILED',
-          message: `Failed to fetch mid prices: ${err instanceof Error ? err.message : String(err)}`,
+          message: `Failed to fetch mid prices: ${errorMessage(err)}`,
         })
       }
 
       const mid = allMids[coin]
       if (!mid) {
-        return c.error({
-          code: 'PRICE_NOT_FOUND',
-          message: `No mid price found for ${coin}`,
-        })
+        return c.error({ code: 'PRICE_NOT_FOUND', message: `No mid price found for ${coin}` })
       }
 
       const midNum = parseFloat(mid)
@@ -127,46 +121,48 @@ order.command('create', {
       formattedPrice = formatPrice(slippagePrice, szDecimals, 'perp')
     }
 
-    // Build the main order object
-    const mainOrder = {
-      a: assetId,
-      b: isBuy,
-      p: formattedPrice,
-      s: formattedSize,
-      r: c.options.reduceOnly,
-      t: { limit: { tif: tifStr } },
-    }
+    // Build orders array
+    const orders: any[] = [
+      {
+        a: assetId,
+        b: isBuy,
+        p: formattedPrice,
+        s: formattedSize,
+        r: c.options.reduceOnly,
+        t: { limit: { tif: tifStr } },
+      },
+    ]
 
-    // Build orders array, optionally including TP/SL trigger orders
-    const orders: (typeof mainOrder)[] = [mainOrder]
-    const hasTP = c.options.tp !== undefined
-    const hasSL = c.options.sl !== undefined
+    let tpIndex: number | undefined
+    let slIndex: number | undefined
 
-    if (hasTP && c.options.tp) {
+    if (c.options.tp) {
       const tpPx = formatPrice(c.options.tp, szDecimals, 'perp')
+      tpIndex = orders.length
       orders.push({
         a: assetId,
-        b: !isBuy, // opposite side
+        b: !isBuy,
         p: tpPx,
         s: formattedSize,
         r: true,
-        t: { trigger: { isMarket: true, triggerPx: tpPx, tpsl: 'tp' } } as any,
+        t: { trigger: { isMarket: true, triggerPx: tpPx, tpsl: 'tp' } },
       })
     }
 
-    if (hasSL && c.options.sl) {
+    if (c.options.sl) {
       const slPx = formatPrice(c.options.sl, szDecimals, 'perp')
+      slIndex = orders.length
       orders.push({
         a: assetId,
-        b: !isBuy, // opposite side
+        b: !isBuy,
         p: slPx,
         s: formattedSize,
         r: true,
-        t: { trigger: { isMarket: true, triggerPx: slPx, tpsl: 'sl' } } as any,
+        t: { trigger: { isMarket: true, triggerPx: slPx, tpsl: 'sl' } },
       })
     }
 
-    const grouping = hasTP || hasSL ? 'normalTpsl' : 'na'
+    const grouping = tpIndex !== undefined || slIndex !== undefined ? 'normalTpsl' : 'na'
 
     // Dry-run: return preview without executing
     if (c.options.dryRun) {
@@ -189,54 +185,28 @@ order.command('create', {
       const response = await c.var.exchange.order({ orders, grouping })
       const statuses = response.response.data.statuses
 
-      const mainStatus = statuses[0]
-
-      let status: string
-      let oid: number | null = null
-      let avgPx: string | undefined
-      let totalSz: string | undefined
-
-      if (typeof mainStatus === 'object' && mainStatus !== null && 'resting' in mainStatus) {
-        status = 'resting'
-        oid = (mainStatus as any).resting.oid
-      } else if (typeof mainStatus === 'object' && mainStatus !== null && 'filled' in mainStatus) {
-        status = 'filled'
-        oid = (mainStatus as any).filled.oid
-        avgPx = (mainStatus as any).filled.avgPx
-        totalSz = (mainStatus as any).filled.totalSz
-      } else if (typeof mainStatus === 'object' && mainStatus !== null && 'error' in mainStatus) {
-        return c.error({
-          code: 'ORDER_REJECTED',
-          message: (mainStatus as any).error,
-        })
-      } else if (mainStatus === 'waitingForFill') {
-        status = 'waitingForFill'
-      } else if (mainStatus === 'waitingForTrigger') {
-        status = 'waitingForTrigger'
-      } else {
-        status = String(mainStatus)
+      const main = parseOrderStatus(statuses[0])
+      if (main.kind === 'error') {
+        return c.error({ code: 'ORDER_REJECTED', message: main.message })
       }
+
+      const status = main.kind === 'string' ? main.value : main.kind
+      const oid = main.kind === 'resting' || main.kind === 'filled' ? main.oid : null
+      const avgPx = main.kind === 'filled' ? main.avgPx : undefined
+      const totalSz = main.kind === 'filled' ? main.totalSz : undefined
 
       // Parse TP/SL statuses if present
       let tpStatus: string | undefined
       let slStatus: string | undefined
 
-      if (hasTP && statuses[1]) {
-        const s = statuses[1]
-        if (typeof s === 'object' && s !== null && 'resting' in s) tpStatus = 'resting'
-        else if (typeof s === 'object' && s !== null && 'filled' in s) tpStatus = 'filled'
-        else if (typeof s === 'object' && s !== null && 'error' in s)
-          tpStatus = `error: ${(s as any).error}`
-        else tpStatus = String(s)
+      if (tpIndex !== undefined && statuses[tpIndex]) {
+        const tp = parseOrderStatus(statuses[tpIndex])
+        tpStatus = tp.kind === 'error' ? `error: ${tp.message}` : tp.kind === 'string' ? tp.value : tp.kind
       }
 
-      if (hasSL && statuses[hasTP ? 2 : 1]) {
-        const s = statuses[hasTP ? 2 : 1]
-        if (typeof s === 'object' && s !== null && 'resting' in s) slStatus = 'resting'
-        else if (typeof s === 'object' && s !== null && 'filled' in s) slStatus = 'filled'
-        else if (typeof s === 'object' && s !== null && 'error' in s)
-          slStatus = `error: ${(s as any).error}`
-        else slStatus = String(s)
+      if (slIndex !== undefined && statuses[slIndex]) {
+        const sl = parseOrderStatus(statuses[slIndex])
+        slStatus = sl.kind === 'error' ? `error: ${sl.message}` : sl.kind === 'string' ? sl.value : sl.kind
       }
 
       return c.ok({
@@ -256,10 +226,7 @@ order.command('create', {
         slStatus,
       })
     } catch (err) {
-      return c.error({
-        code: 'ORDER_FAILED',
-        message: err instanceof Error ? err.message : String(err),
-      })
+      return c.error({ code: 'ORDER_FAILED', message: errorMessage(err) })
     }
   },
 })
@@ -284,88 +251,55 @@ order.command('cancel', {
     }),
   }),
   async run(c: any) {
-    // Guard: read-only account
-    if (!c.var.exchange) {
-      return c.error({
-        code: 'READ_ONLY_ACCOUNT',
-        message: 'This account has no private key and cannot cancel orders',
-        cta: {
-          commands: [{ command: 'account add --name main', description: 'Add a trading account' }],
-          description: 'Get started:',
-        },
-      })
-    }
+    const guard = requireExchange(c, 'cancel orders')
+    if (guard) return guard
 
-    // Fetch open orders
+    // Fetch open orders and meta in parallel
     let openOrders: any[]
+    let assetMap: Map<string, number>
     try {
-      openOrders = await c.var.info.frontendOpenOrders({ user: c.var.address })
+      ;[openOrders, assetMap] = await Promise.all([
+        c.var.info.frontendOpenOrders({ user: c.var.address }),
+        buildAssetMap(c.var.info),
+      ])
     } catch (err) {
-      return c.error({
-        code: 'FETCH_ORDERS_FAILED',
-        message: err instanceof Error ? err.message : String(err),
-      })
+      return c.error({ code: 'FETCH_ORDERS_FAILED', message: errorMessage(err) })
     }
 
     // Find the target order
     const target = openOrders.find((o: any) => o.oid === c.args.oid)
     if (!target) {
-      return c.error({
-        code: 'ORDER_NOT_FOUND',
-        message: `Order ${c.args.oid} not found in open orders`,
-      })
+      return c.error({ code: 'ORDER_NOT_FOUND', message: `Order ${c.args.oid} not found in open orders` })
     }
 
-    const side = target.side === 'B' ? 'Buy' : target.side === 'A' ? 'Sell' : target.side
     const cancelledDetails = {
       oid: target.oid,
       coin: target.coin,
-      side,
+      side: formatSide(target.side),
       size: target.sz ?? '0',
       price: target.limitPx ?? target.px ?? '0',
     }
 
-    // Dry-run: return details without executing
     if (c.options.dryRun) {
-      return c.ok({
-        dryRun: true,
-        cancelled: cancelledDetails,
-      })
+      return c.ok({ dryRun: true, cancelled: cancelledDetails })
     }
 
-    // Resolve asset ID from the order's coin
-    let assetId: number
-    try {
-      const resolved = await resolveAsset(c.var.info, target.coin)
-      assetId = resolved.assetId
-    } catch (err) {
-      return c.error({
-        code: 'ASSET_NOT_FOUND',
-        message: err instanceof Error ? err.message : String(err),
-      })
+    const assetId = assetMap.get(target.coin)
+    if (assetId === undefined) {
+      return c.error({ code: 'ASSET_NOT_FOUND', message: `Asset ID not found for ${target.coin}` })
     }
 
-    // Execute cancel
     try {
       const response = await c.var.exchange.cancel({ cancels: [{ a: assetId, o: c.args.oid }] })
-      const cancelStatus = response.response.data.statuses[0]
+      const cancelStatus = parseOrderStatus(response.response.data.statuses[0])
 
-      if (typeof cancelStatus === 'object' && cancelStatus !== null && 'error' in cancelStatus) {
-        return c.error({
-          code: 'CANCEL_FAILED',
-          message: (cancelStatus as any).error,
-        })
+      if (cancelStatus.kind === 'error') {
+        return c.error({ code: 'CANCEL_FAILED', message: cancelStatus.message })
       }
 
-      return c.ok({
-        dryRun: false,
-        cancelled: cancelledDetails,
-      })
+      return c.ok({ dryRun: false, cancelled: cancelledDetails })
     } catch (err) {
-      return c.error({
-        code: 'CANCEL_FAILED',
-        message: err instanceof Error ? err.message : String(err),
-      })
+      return c.error({ code: 'CANCEL_FAILED', message: errorMessage(err) })
     }
   },
 })
@@ -390,27 +324,19 @@ order.command('cancel-all', {
     ),
   }),
   async run(c: any) {
-    // Guard: read-only account
-    if (!c.var.exchange) {
-      return c.error({
-        code: 'READ_ONLY_ACCOUNT',
-        message: 'This account has no private key and cannot cancel orders',
-        cta: {
-          commands: [{ command: 'account add --name main', description: 'Add a trading account' }],
-          description: 'Get started:',
-        },
-      })
-    }
+    const guard = requireExchange(c, 'cancel orders')
+    if (guard) return guard
 
-    // Fetch all open orders
+    // Fetch open orders and meta in parallel
     let openOrders: any[]
+    let assetMap: Map<string, number>
     try {
-      openOrders = await c.var.info.frontendOpenOrders({ user: c.var.address })
+      ;[openOrders, assetMap] = await Promise.all([
+        c.var.info.frontendOpenOrders({ user: c.var.address }),
+        buildAssetMap(c.var.info),
+      ])
     } catch (err) {
-      return c.error({
-        code: 'FETCH_ORDERS_FAILED',
-        message: err instanceof Error ? err.message : String(err),
-      })
+      return c.error({ code: 'FETCH_ORDERS_FAILED', message: errorMessage(err) })
     }
 
     // Filter by coin if provided
@@ -426,54 +352,25 @@ order.command('cancel-all', {
     const cancelledSummary = filtered.map((o: any) => ({
       oid: o.oid,
       coin: o.coin,
-      side: o.side === 'B' ? 'Buy' : o.side === 'A' ? 'Sell' : o.side,
+      side: formatSide(o.side),
       size: o.sz ?? '0',
     }))
 
-    // Dry-run: return list without executing
     if (c.options.dryRun) {
-      return c.ok({
-        dryRun: true,
-        count: filtered.length,
-        cancelled: cancelledSummary,
-      })
+      return c.ok({ dryRun: true, count: filtered.length, cancelled: cancelledSummary })
     }
 
-    // Build coin -> assetId map from meta
-    let coinToAssetId: Map<string, number>
-    try {
-      const meta = await c.var.info.meta()
-      coinToAssetId = new Map<string, number>()
-      meta.universe.forEach((a: any, i: number) => {
-        coinToAssetId.set(a.name, i)
-      })
-    } catch (err) {
-      return c.error({
-        code: 'META_FETCH_FAILED',
-        message: err instanceof Error ? err.message : String(err),
-      })
-    }
-
-    // Build cancels array
+    // Build cancels array using pre-fetched asset map
     const cancels = filtered.map((o: any) => ({
-      a: coinToAssetId.get(o.coin)!,
+      a: assetMap.get(o.coin)!,
       o: o.oid,
     }))
 
-    // Execute bulk cancel
     try {
       await c.var.exchange.cancel({ cancels })
-
-      return c.ok({
-        dryRun: false,
-        count: filtered.length,
-        cancelled: cancelledSummary,
-      })
+      return c.ok({ dryRun: false, count: filtered.length, cancelled: cancelledSummary })
     } catch (err) {
-      return c.error({
-        code: 'CANCEL_ALL_FAILED',
-        message: err instanceof Error ? err.message : String(err),
-      })
+      return c.error({ code: 'CANCEL_ALL_FAILED', message: errorMessage(err) })
     }
   },
 })
