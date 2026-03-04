@@ -254,14 +254,14 @@ order.command('cancel', {
     const guard = requireExchange(c, 'cancel orders')
     if (guard) return guard
 
-    // Fetch open orders and meta in parallel
+    // Fetch open orders (with fallback) and meta in parallel
     let openOrders: any[]
     let assetMap: Map<string, number>
     try {
-      ;[openOrders, assetMap] = await Promise.all([
-        c.var.info.frontendOpenOrders({ user: c.var.address }),
-        buildAssetMap(c.var.info),
-      ])
+      const ordersPromise = c.var.info
+        .frontendOpenOrders({ user: c.var.address })
+        .catch(() => c.var.info.openOrders({ user: c.var.address }))
+      ;[openOrders, assetMap] = await Promise.all([ordersPromise, buildAssetMap(c.var.info)])
     } catch (err) {
       return c.error({ code: 'FETCH_ORDERS_FAILED', message: errorMessage(err) })
     }
@@ -322,19 +322,22 @@ order.command('cancel-all', {
         size: z.string(),
       }),
     ),
+    failed: z
+      .array(z.object({ oid: z.number(), error: z.string() }))
+      .optional(),
   }),
   async run(c: any) {
     const guard = requireExchange(c, 'cancel orders')
     if (guard) return guard
 
-    // Fetch open orders and meta in parallel
+    // Fetch open orders (with fallback) and meta in parallel
     let openOrders: any[]
     let assetMap: Map<string, number>
     try {
-      ;[openOrders, assetMap] = await Promise.all([
-        c.var.info.frontendOpenOrders({ user: c.var.address }),
-        buildAssetMap(c.var.info),
-      ])
+      const ordersPromise = c.var.info
+        .frontendOpenOrders({ user: c.var.address })
+        .catch(() => c.var.info.openOrders({ user: c.var.address }))
+      ;[openOrders, assetMap] = await Promise.all([ordersPromise, buildAssetMap(c.var.info)])
     } catch (err) {
       return c.error({ code: 'FETCH_ORDERS_FAILED', message: errorMessage(err) })
     }
@@ -367,8 +370,35 @@ order.command('cancel-all', {
     }))
 
     try {
-      await c.var.exchange.cancel({ cancels })
-      return c.ok({ dryRun: false, count: filtered.length, cancelled: cancelledSummary })
+      const response = await c.var.exchange.cancel({ cancels })
+      const statuses = response?.response?.data?.statuses ?? []
+
+      // Check for partial failures
+      const failed: { oid: number; error: string }[] = []
+      for (let i = 0; i < statuses.length; i++) {
+        const parsed = parseOrderStatus(statuses[i])
+        if (parsed.kind === 'error') {
+          failed.push({ oid: filtered[i].oid, error: parsed.message })
+        }
+      }
+
+      if (failed.length > 0 && failed.length === filtered.length) {
+        return c.error({
+          code: 'CANCEL_ALL_FAILED',
+          message: `All ${failed.length} cancellations failed: ${failed[0]!.error}`,
+        })
+      }
+
+      const actualCancelled = cancelledSummary.filter(
+        (_: any, i: number) => !failed.some((f) => f.oid === filtered[i].oid),
+      )
+
+      return c.ok({
+        dryRun: false,
+        count: actualCancelled.length,
+        cancelled: actualCancelled,
+        ...(failed.length > 0 ? { failed } : {}),
+      })
     } catch (err) {
       return c.error({ code: 'CANCEL_ALL_FAILED', message: errorMessage(err) })
     }
