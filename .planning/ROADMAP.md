@@ -74,13 +74,14 @@ Plans:
 3. User can cancel an order by ID and cancel all open orders (with optional coin filter)
 4. User can set leverage for a coin in cross or isolated mode (`hl position leverage BTC 10 --isolated`)
 5. User can place a take-profit or stop-loss order with a trigger price against an open position
-   **Plans**: 3 plans
+   **Plans**: 4 plans
 
 Plans:
 
 - [x] 02-01-PLAN.md — ExchangeClient middleware, asset resolution, and SDK precision utilities (2026-03-04)
 - [x] 02-02-PLAN.md — Order commands (`hl order create`, `hl order cancel`, `hl order cancel-all`) (2026-03-04)
 - [x] 02-03-PLAN.md — Position management commands (`hl position leverage`, `hl position tp`, `hl position sl`) (2026-03-04)
+- [x] 02-04-PLAN.md — UAT gap closure: price as positional arg, examples/hint, README update (2026-03-04)
 
 ### Phase 3: Live Streaming
 
@@ -107,5 +108,5 @@ Phases execute in numeric order: 1 -> 1.5 -> 2 -> 3
 | ------------------------- | -------------- | ----------- | ---------- |
 | 1. Foundation             | 5/5            | Complete    | 2026-03-03 |
 | 1.5. Developer Experience | 3/3            | Complete    | 2026-03-03 |
-| 2. Trade Execution        | 4/4 | Complete   | 2026-03-03 |
+| 2. Trade Execution        | 4/4 | Complete   | 2026-03-04 |
 | 3. Live Streaming         | 0/1            | Not started | -          |

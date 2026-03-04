@@ -36,7 +36,7 @@ Progress: [##########] 100% (Phase 1) | [##########] 100% (Phase 1.5) | [#######
 
 **Velocity:**
 
-- Total plans completed: 6
+- Total plans completed: 12
 - Average duration: ~10 min
 - Total execution time: ~58 min
 
@@ -50,7 +50,7 @@ Progress: [##########] 100% (Phase 1) | [##########] 100% (Phase 1.5) | [#######
 
 **Recent Trend:**
 
-- Last 10 plans: 01-02 (12m), 01-03 (10m), 01-04 (10m), 01-05 (15m), 01.5-01 (14m), 01.5-02 (5m), 01.5-03 (4m), 02-01 (6m), 02-02 (3m), 02-03 (3m), 02-04 (5m)
+- Last 10 plans: 01-03 (10m), 01-04 (10m), 01-05 (15m), 01.5-01 (14m), 01.5-02 (5m), 01.5-03 (4m), 02-01 (6m), 02-02 (3m), 02-03 (3m), 02-04 (5m)
 - Trend: Consistent execution pace
 
 _Updated after each plan completion_

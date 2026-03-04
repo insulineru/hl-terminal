@@ -82,7 +82,13 @@ order.command('create', {
       return c.error({ code: 'ASSET_NOT_FOUND', message: errorMessage(err) })
     }
 
-    const formattedSize = formatSize(c.args.size, szDecimals)
+    let formattedSize: string
+    try {
+      formattedSize = formatSize(c.args.size, szDecimals)
+    } catch (err) {
+      return c.error({ code: 'INVALID_SIZE', message: `Invalid size "${c.args.size}": ${errorMessage(err)}` })
+    }
+
     const isBuy = c.args.side === 'buy'
 
     // Determine order type and price
@@ -93,7 +99,11 @@ order.command('create', {
     if (c.args.price !== undefined) {
       // Limit order
       orderType = 'limit'
-      formattedPrice = formatPrice(c.args.price!, szDecimals, 'perp')
+      try {
+        formattedPrice = formatPrice(c.args.price!, szDecimals, 'perp')
+      } catch (err) {
+        return c.error({ code: 'INVALID_PRICE', message: `Invalid price "${c.args.price}": ${errorMessage(err)}` })
+      }
       tifStr = TIF_MAP[c.options.tif] ?? 'Gtc'
     } else {
       // Market order — fetch mid price and apply slippage
@@ -137,7 +147,12 @@ order.command('create', {
     let slIndex: number | undefined
 
     if (c.options.tp) {
-      const tpPx = formatPrice(c.options.tp, szDecimals, 'perp')
+      let tpPx: string
+      try {
+        tpPx = formatPrice(c.options.tp, szDecimals, 'perp')
+      } catch (err) {
+        return c.error({ code: 'INVALID_PRICE', message: `Invalid TP price "${c.options.tp}": ${errorMessage(err)}` })
+      }
       tpIndex = orders.length
       orders.push({
         a: assetId,
@@ -150,7 +165,12 @@ order.command('create', {
     }
 
     if (c.options.sl) {
-      const slPx = formatPrice(c.options.sl, szDecimals, 'perp')
+      let slPx: string
+      try {
+        slPx = formatPrice(c.options.sl, szDecimals, 'perp')
+      } catch (err) {
+        return c.error({ code: 'INVALID_PRICE', message: `Invalid SL price "${c.options.sl}": ${errorMessage(err)}` })
+      }
       slIndex = orders.length
       orders.push({
         a: assetId,
@@ -363,11 +383,17 @@ order.command('cancel-all', {
       return c.ok({ dryRun: true, count: filtered.length, cancelled: cancelledSummary })
     }
 
-    // Build cancels array using pre-fetched asset map
-    const cancels = filtered.map((o: any) => ({
-      a: assetMap.get(o.coin)!,
-      o: o.oid,
-    }))
+    // Build cancels array, skipping orders with unknown coins
+    const cancels: { a: number; o: number }[] = []
+    for (const o of filtered) {
+      const a = assetMap.get(o.coin)
+      if (a === undefined) continue
+      cancels.push({ a, o: o.oid })
+    }
+
+    if (cancels.length === 0) {
+      return c.error({ code: 'CANCEL_ALL_FAILED', message: 'Could not resolve asset IDs for any orders' })
+    }
 
     try {
       const response = await c.var.exchange.cancel({ cancels })

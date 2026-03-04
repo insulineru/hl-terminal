@@ -15,7 +15,7 @@ position.command('leverage', {
   description: 'Set leverage for a coin (cross or isolated)',
   args: z.object({
     coin: z.string().describe('Coin symbol (e.g. BTC, ETH)'),
-    leverage: z.coerce.number().int().min(1).describe('Leverage value (1-100)'),
+    leverage: z.coerce.number().int().min(1).max(100).describe('Leverage value (1-100)'),
   }),
   options: z.object({
     isolated: z.boolean().default(false).describe('Use isolated margin mode'),

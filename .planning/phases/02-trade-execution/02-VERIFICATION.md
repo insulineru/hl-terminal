@@ -117,7 +117,7 @@ The following behaviors require live exchange interaction with a funded testnet 
 
 **Test:** `hl order create BTC buy 0.001 --price 50000`
 **Expected:** Returns `status: "resting"` with a numeric `oid`
-**Why human:** Requires authenticated ExchangeClient with private key, live Hyperliquid testnet
+**Why human:** Requires an authenticated ExchangeClient with private key, live Hyperliquid testnet
 
 #### 2. Live Market Order Fill
 
