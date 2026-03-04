@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0
+
+### Minor Changes
+
+- Add trade execution commands: order create, cancel, cancel-all, and position leverage management
+
 ## 0.2.2
 
 ### Patch Changes

@@ -22,7 +22,7 @@
   },
   "[!start-pkg]": "",
   "name": "hl-terminal",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "Hyperliquid DEX terminal — read market data, manage accounts, and execute trades from the command line or via AI agent (MCP)",
   "type": "module",
   "license": "MIT",
