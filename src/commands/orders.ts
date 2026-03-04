@@ -1,4 +1,5 @@
 import { z } from 'incur'
+import { formatSide } from '../lib/exchange.js'
 
 export const orders = {
   description: 'View open orders with ID, side, size, price, type',
@@ -28,7 +29,7 @@ export const orders = {
     const openOrders = (rawOrders ?? []).map((o: any) => ({
       oid: o.oid ?? 0,
       coin: o.coin ?? '',
-      side: o.side === 'B' ? 'Buy' : o.side === 'A' ? 'Sell' : (o.side ?? ''),
+      side: formatSide(o.side ?? ''),
       size: o.sz ?? '0',
       price: o.limitPx ?? o.px ?? '0',
       orderType: o.orderType ?? 'Limit',

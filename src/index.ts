@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { Cli, z, middleware } from 'incur'
 import { loadActiveAccount } from './lib/config.js'
-import { createInfoClient } from './lib/client.js'
+import { createInfoClient, createExchangeClient } from './lib/client.js'
 import { account } from './commands/account.js'
 import { price } from './commands/price.js'
 import { balance } from './commands/balance.js'
@@ -10,10 +10,13 @@ import { orders } from './commands/orders.js'
 import { markets } from './commands/markets.js'
 import { funding } from './commands/funding.js'
 import { fills } from './commands/fills.js'
+import { order } from './commands/order.js'
+import { position } from './commands/position.js'
 
 // Vars schema for middleware injection
 const vars = z.object({
   info: z.any().optional(),
+  exchange: z.any().optional(),
   address: z.string().optional(),
   account: z.any().optional(),
   testnet: z.boolean().default(false),
@@ -65,6 +68,18 @@ cli.use(
     c.set('address', acct.address)
     c.set('account', acct)
 
+    // Lazily create ExchangeClient only when first accessed (avoids crypto overhead for read-only commands)
+    if (acct.privateKey) {
+      let _exchange: ReturnType<typeof createExchangeClient> | undefined
+      const exchangeProxy = new Proxy({} as ReturnType<typeof createExchangeClient>, {
+        get(_, prop) {
+          if (!_exchange) _exchange = createExchangeClient(acct.privateKey!, isTestnet)
+          return (_exchange as any)[prop]
+        },
+      })
+      c.set('exchange', exchangeProxy)
+    }
+
     await next()
   }),
 )
@@ -78,6 +93,8 @@ cli.command('orders', orders)
 cli.command('markets', markets)
 cli.command('funding', funding)
 cli.command('fills', fills)
+cli.command(order)
+cli.command(position)
 
 cli.serve()
 

@@ -10,6 +10,7 @@
 
 - **Market data** — prices, positions, orders, balances, funding rates, fill history
 - **Account management** — add, remove, switch accounts with secure local storage
+- **Trade execution** -- limit/market orders, cancel, leverage, take-profit, stop-loss
 - **Agent-native** — built-in MCP server mode for AI agent integration
 - **Machine-readable** — JSON output, LLM manifest, structured error codes
 - **Testnet support** — `--testnet` flag for risk-free testing
@@ -41,6 +42,15 @@ hl-terminal balance
 
 # List available markets
 hl-terminal markets
+
+# Place a limit buy order
+hl-terminal order create BTC buy 0.001 95000
+
+# Place a market sell order
+hl-terminal order create ETH sell 1.5
+
+# Set 10x leverage on BTC
+hl-terminal position leverage BTC 10
 ```
 
 ## Commands
@@ -66,6 +76,22 @@ hl-terminal markets
 | `hl-terminal markets`        | Available markets with metadata              |
 | `hl-terminal funding [coin]` | Current funding rates or history for a coin  |
 | `hl-terminal fills [coin]`   | Trade history with time range and pagination |
+
+### Trade Execution
+
+| Command | Description |
+| --- | --- |
+| `hl-terminal order create <coin> <side> <size> [price]` | Place limit (with price) or market (without) order |
+| `hl-terminal order cancel <oid>` | Cancel an order by ID |
+| `hl-terminal order cancel-all` | Cancel all open orders (optional `--coin` filter) |
+
+### Position Management
+
+| Command | Description |
+| --- | --- |
+| `hl-terminal position leverage <coin> <leverage>` | Set leverage (add `--isolated` for isolated margin) |
+| `hl-terminal position tp <coin> --price <price>` | Place take-profit trigger on open position |
+| `hl-terminal position sl <coin> --price <price>` | Place stop-loss trigger on open position |
 
 ### Global Options
 
