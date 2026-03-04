@@ -3,6 +3,7 @@ import { formatSide } from '../lib/exchange.js'
 
 export const orders = {
   description: 'View open orders with ID, side, size, price, type',
+  examples: [{ description: 'View all open orders' }],
   output: z.object({
     orders: z.array(
       z.object({

@@ -2,6 +2,8 @@ import { z } from 'incur'
 
 export const balance = {
   description: 'View account balance (perps margin + spot wallet)',
+  examples: [{ description: 'View perps margin and spot wallet balances' }],
+  hint: 'Shows perps margin summary and non-zero spot token balances.',
   output: z.object({
     perps: z.object({
       accountValue: z.string(),

@@ -22,6 +22,15 @@ position.command('leverage', {
     cross: z.boolean().default(false).describe('Use cross margin mode (default)'),
     dryRun: z.boolean().default(false).describe('Preview without executing'),
   }),
+  examples: [
+    { args: { coin: 'BTC', leverage: 10 }, description: 'Set 10x cross leverage on BTC' },
+    {
+      args: { coin: 'ETH', leverage: 5 },
+      options: { isolated: true },
+      description: '5x isolated leverage on ETH',
+    },
+  ],
+  hint: 'Set leverage before placing orders. Cross margin is the default.',
   alias: { dryRun: 'd' },
   output: z.object({
     dryRun: z.boolean(),
@@ -63,7 +72,16 @@ position.command('leverage', {
         isCross,
         leverage: c.args.leverage,
       })
-      return c.ok({ dryRun: false, coin, leverage: c.args.leverage, mode })
+      return c.ok(
+        { dryRun: false, coin, leverage: c.args.leverage, mode },
+        {
+          cta: {
+            commands: [
+              { command: 'order create', description: 'Place an order with new leverage' },
+            ],
+          },
+        },
+      )
     } catch (err) {
       return c.error({ code: 'LEVERAGE_FAILED', message: errorMessage(err) })
     }
@@ -129,17 +147,29 @@ async function placeTriggerOrder(
 
     if (tpsl === 'tp') {
       if (isLong && triggerNum <= mid) {
-        return c.error({ code, message: `${label} price must be above current price (${mid}) for a long position` })
+        return c.error({
+          code,
+          message: `${label} price must be above current price (${mid}) for a long position`,
+        })
       }
       if (!isLong && triggerNum >= mid) {
-        return c.error({ code, message: `${label} price must be below current price (${mid}) for a short position` })
+        return c.error({
+          code,
+          message: `${label} price must be below current price (${mid}) for a short position`,
+        })
       }
     } else {
       if (isLong && triggerNum >= mid) {
-        return c.error({ code, message: `${label} price must be below current price (${mid}) for a long position` })
+        return c.error({
+          code,
+          message: `${label} price must be below current price (${mid}) for a long position`,
+        })
       }
       if (!isLong && triggerNum <= mid) {
-        return c.error({ code, message: `${label} price must be above current price (${mid}) for a short position` })
+        return c.error({
+          code,
+          message: `${label} price must be above current price (${mid}) for a short position`,
+        })
       }
     }
   }
@@ -147,7 +177,14 @@ async function placeTriggerOrder(
   const side = sideBoolean ? 'Buy' : 'Sell'
 
   if (dryRun) {
-    return c.ok({ dryRun: true, coin, triggerPrice: formattedTriggerPx, side, positionSide, status: 'DRY_RUN' })
+    return c.ok({
+      dryRun: true,
+      coin,
+      triggerPrice: formattedTriggerPx,
+      side,
+      positionSide,
+      status: 'DRY_RUN',
+    })
   }
 
   try {
@@ -172,7 +209,17 @@ async function placeTriggerOrder(
 
     const statusStr = parsed.kind === 'string' ? parsed.value : parsed.kind
 
-    return c.ok({ dryRun: false, coin, triggerPrice: formattedTriggerPx, side, positionSide, status: statusStr })
+    return c.ok(
+      {
+        dryRun: false,
+        coin,
+        triggerPrice: formattedTriggerPx,
+        side,
+        positionSide,
+        status: statusStr,
+      },
+      { cta: { commands: [{ command: 'orders', description: 'View trigger orders' }] } },
+    )
   } catch (err) {
     return c.error({ code: tpsl === 'tp' ? 'TP_FAILED' : 'SL_FAILED', message: errorMessage(err) })
   }
@@ -194,6 +241,14 @@ position.command('tp', {
     price: z.string().describe('Take-profit trigger price'),
     dryRun: z.boolean().default(false).describe('Preview without executing'),
   }),
+  examples: [
+    {
+      args: { coin: 'BTC' },
+      options: { price: '100000' },
+      description: 'Take-profit on BTC at $100k',
+    },
+  ],
+  hint: 'Scales with position size. Auto-detects long/short direction.',
   alias: { dryRun: 'd' },
   output: triggerOutput,
   async run(c: any) {
@@ -201,7 +256,13 @@ position.command('tp', {
     if (guard) return guard
 
     try {
-      return await placeTriggerOrder(c, c.args.coin.toUpperCase(), c.options.price, 'tp', c.options.dryRun)
+      return await placeTriggerOrder(
+        c,
+        c.args.coin.toUpperCase(),
+        c.options.price,
+        'tp',
+        c.options.dryRun,
+      )
     } catch (err) {
       return c.error({ code: 'TP_FAILED', message: errorMessage(err) })
     }
@@ -215,6 +276,10 @@ position.command('sl', {
     price: z.string().describe('Stop-loss trigger price'),
     dryRun: z.boolean().default(false).describe('Preview without executing'),
   }),
+  examples: [
+    { args: { coin: 'BTC' }, options: { price: '90000' }, description: 'Stop-loss on BTC at $90k' },
+  ],
+  hint: 'Scales with position size. Auto-detects long/short direction.',
   alias: { dryRun: 'd' },
   output: triggerOutput,
   async run(c: any) {
@@ -222,7 +287,13 @@ position.command('sl', {
     if (guard) return guard
 
     try {
-      return await placeTriggerOrder(c, c.args.coin.toUpperCase(), c.options.price, 'sl', c.options.dryRun)
+      return await placeTriggerOrder(
+        c,
+        c.args.coin.toUpperCase(),
+        c.options.price,
+        'sl',
+        c.options.dryRun,
+      )
     } catch (err) {
       return c.error({ code: 'SL_FAILED', message: errorMessage(err) })
     }

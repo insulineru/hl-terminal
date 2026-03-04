@@ -2,6 +2,7 @@ import { z } from 'incur'
 
 export const markets = {
   description: 'List available markets with metadata (perps + spot)',
+  examples: [{ description: 'List all available perp markets' }],
   output: z.object({
     markets: z.array(
       z.object({

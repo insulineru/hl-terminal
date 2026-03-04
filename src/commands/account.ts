@@ -52,6 +52,8 @@ account.command('add', {
   options: z.object({
     name: z.string().describe('Account label'),
   }),
+  examples: [{ options: { name: 'main' }, description: 'Add a trading account' }],
+  hint: 'Your private key is entered securely and never displayed. Pipe from a file: echo $KEY | hl account add --name main',
   alias: { name: 'n' },
   output: z.object({
     name: z.string(),
@@ -82,11 +84,14 @@ account.command('add', {
       const list = listAccounts()
       const isDefault = list.find((a) => a.name === acct.name)?.isDefault ?? false
 
-      return c.ok({
-        name: acct.name,
-        address: acct.address,
-        isDefault,
-      })
+      return c.ok(
+        {
+          name: acct.name,
+          address: acct.address,
+          isDefault,
+        },
+        { cta: { commands: [{ command: 'balance', description: 'Check account balance' }] } },
+      )
     } catch (err) {
       return c.error({
         code: 'ADD_FAILED',
@@ -104,6 +109,13 @@ account.command('watch', {
   options: z.object({
     name: z.string().describe('Account label'),
   }),
+  examples: [
+    {
+      args: { address: '0x...' },
+      options: { name: 'whale' },
+      description: 'Watch a wallet (read-only)',
+    },
+  ],
   alias: { name: 'n' },
   output: z.object({
     name: z.string(),
@@ -116,11 +128,14 @@ account.command('watch', {
       const list = listAccounts()
       const isDefault = list.find((a) => a.name === acct.name)?.isDefault ?? false
 
-      return c.ok({
-        name: acct.name,
-        address: acct.address,
-        isDefault,
-      })
+      return c.ok(
+        {
+          name: acct.name,
+          address: acct.address,
+          isDefault,
+        },
+        { cta: { commands: [{ command: 'balance', description: 'Check wallet balance' }] } },
+      )
     } catch (err) {
       return c.error({
         code: 'WATCH_FAILED',
@@ -132,6 +147,7 @@ account.command('watch', {
 
 account.command('ls', {
   description: 'List all accounts',
+  examples: [{ description: 'List all configured accounts' }],
   output: z.object({
     accounts: z.array(
       z.object({
@@ -165,6 +181,7 @@ account.command('rm', {
   args: z.object({
     name: z.string().describe('Account name to remove'),
   }),
+  examples: [{ args: { name: 'old' }, description: 'Remove an account' }],
   output: z.object({
     removed: z.string(),
     newDefault: z.string().nullable(),
@@ -193,6 +210,7 @@ account.command('switch', {
   args: z.object({
     name: z.string().describe('Account name to set as default'),
   }),
+  examples: [{ args: { name: 'main' }, description: 'Switch default account' }],
   output: z.object({
     name: z.string(),
     address: z.string(),
@@ -203,10 +221,13 @@ account.command('switch', {
       const accounts = listAccounts()
       const acct = accounts.find((a) => a.name === c.args.name)
 
-      return c.ok({
-        name: c.args.name,
-        address: acct?.address ?? '',
-      })
+      return c.ok(
+        {
+          name: c.args.name,
+          address: acct?.address ?? '',
+        },
+        { cta: { commands: [{ command: 'balance', description: 'View new account balance' }] } },
+      )
     } catch (err) {
       return c.error({
         code: 'SWITCH_FAILED',

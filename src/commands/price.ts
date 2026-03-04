@@ -5,6 +5,10 @@ export const price = {
   args: z.object({
     coin: z.string().describe('Coin symbol (e.g. BTC, ETH, SOL)'),
   }),
+  examples: [
+    { args: { coin: 'BTC' }, description: 'Get BTC mid-price' },
+    { args: { coin: 'ETH' }, description: 'Get ETH mid-price' },
+  ],
   output: z.object({
     coin: z.string(),
     mid: z.string(),

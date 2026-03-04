@@ -86,7 +86,10 @@ order.command('create', {
     try {
       formattedSize = formatSize(c.args.size, szDecimals)
     } catch (err) {
-      return c.error({ code: 'INVALID_SIZE', message: `Invalid size "${c.args.size}": ${errorMessage(err)}` })
+      return c.error({
+        code: 'INVALID_SIZE',
+        message: `Invalid size "${c.args.size}": ${errorMessage(err)}`,
+      })
     }
 
     const isBuy = c.args.side === 'buy'
@@ -102,7 +105,10 @@ order.command('create', {
       try {
         formattedPrice = formatPrice(c.args.price!, szDecimals, 'perp')
       } catch (err) {
-        return c.error({ code: 'INVALID_PRICE', message: `Invalid price "${c.args.price}": ${errorMessage(err)}` })
+        return c.error({
+          code: 'INVALID_PRICE',
+          message: `Invalid price "${c.args.price}": ${errorMessage(err)}`,
+        })
       }
       tifStr = TIF_MAP[c.options.tif] ?? 'Gtc'
     } else {
@@ -151,7 +157,10 @@ order.command('create', {
       try {
         tpPx = formatPrice(c.options.tp, szDecimals, 'perp')
       } catch (err) {
-        return c.error({ code: 'INVALID_PRICE', message: `Invalid TP price "${c.options.tp}": ${errorMessage(err)}` })
+        return c.error({
+          code: 'INVALID_PRICE',
+          message: `Invalid TP price "${c.options.tp}": ${errorMessage(err)}`,
+        })
       }
       tpIndex = orders.length
       orders.push({
@@ -169,7 +178,10 @@ order.command('create', {
       try {
         slPx = formatPrice(c.options.sl, szDecimals, 'perp')
       } catch (err) {
-        return c.error({ code: 'INVALID_PRICE', message: `Invalid SL price "${c.options.sl}": ${errorMessage(err)}` })
+        return c.error({
+          code: 'INVALID_PRICE',
+          message: `Invalid SL price "${c.options.sl}": ${errorMessage(err)}`,
+        })
       }
       slIndex = orders.length
       orders.push({
@@ -221,30 +233,42 @@ order.command('create', {
 
       if (tpIndex !== undefined && statuses[tpIndex]) {
         const tp = parseOrderStatus(statuses[tpIndex])
-        tpStatus = tp.kind === 'error' ? `error: ${tp.message}` : tp.kind === 'string' ? tp.value : tp.kind
+        tpStatus =
+          tp.kind === 'error' ? `error: ${tp.message}` : tp.kind === 'string' ? tp.value : tp.kind
       }
 
       if (slIndex !== undefined && statuses[slIndex]) {
         const sl = parseOrderStatus(statuses[slIndex])
-        slStatus = sl.kind === 'error' ? `error: ${sl.message}` : sl.kind === 'string' ? sl.value : sl.kind
+        slStatus =
+          sl.kind === 'error' ? `error: ${sl.message}` : sl.kind === 'string' ? sl.value : sl.kind
       }
 
-      return c.ok({
-        dryRun: false,
-        type: orderType,
-        coin,
-        side: c.args.side,
-        size: formattedSize,
-        price: formattedPrice,
-        tif: orderType === 'limit' ? c.options.tif : undefined,
-        reduceOnly: c.options.reduceOnly,
-        status,
-        oid,
-        avgPx,
-        totalSz,
-        tpStatus,
-        slStatus,
-      })
+      return c.ok(
+        {
+          dryRun: false,
+          type: orderType,
+          coin,
+          side: c.args.side,
+          size: formattedSize,
+          price: formattedPrice,
+          tif: orderType === 'limit' ? c.options.tif : undefined,
+          reduceOnly: c.options.reduceOnly,
+          status,
+          oid,
+          avgPx,
+          totalSz,
+          tpStatus,
+          slStatus,
+        },
+        {
+          cta: {
+            commands: [
+              { command: 'orders', description: 'View open orders' },
+              { command: 'positions', description: 'View positions' },
+            ],
+          },
+        },
+      )
     } catch (err) {
       return c.error({ code: 'ORDER_FAILED', message: errorMessage(err) })
     }
@@ -259,6 +283,8 @@ order.command('cancel', {
   options: z.object({
     dryRun: z.boolean().default(false).describe('Preview without executing'),
   }),
+  examples: [{ args: { oid: 12345 }, description: 'Cancel order by ID' }],
+  hint: 'Find order IDs with: hl orders',
   alias: { dryRun: 'd' },
   output: z.object({
     dryRun: z.boolean(),
@@ -289,7 +315,10 @@ order.command('cancel', {
     // Find the target order
     const target = openOrders.find((o: any) => o.oid === c.args.oid)
     if (!target) {
-      return c.error({ code: 'ORDER_NOT_FOUND', message: `Order ${c.args.oid} not found in open orders` })
+      return c.error({
+        code: 'ORDER_NOT_FOUND',
+        message: `Order ${c.args.oid} not found in open orders`,
+      })
     }
 
     const cancelledDetails = {
@@ -317,7 +346,10 @@ order.command('cancel', {
         return c.error({ code: 'CANCEL_FAILED', message: cancelStatus.message })
       }
 
-      return c.ok({ dryRun: false, cancelled: cancelledDetails })
+      return c.ok(
+        { dryRun: false, cancelled: cancelledDetails },
+        { cta: { commands: [{ command: 'orders', description: 'View remaining orders' }] } },
+      )
     } catch (err) {
       return c.error({ code: 'CANCEL_FAILED', message: errorMessage(err) })
     }
@@ -330,6 +362,11 @@ order.command('cancel-all', {
     coin: z.string().optional().describe('Filter by coin symbol'),
     dryRun: z.boolean().default(false).describe('Preview without executing'),
   }),
+  examples: [
+    { description: 'Cancel all open orders' },
+    { options: { coin: 'BTC' }, description: 'Cancel all BTC orders' },
+  ],
+  hint: 'Use --coin to cancel only orders for a specific market.',
   alias: { dryRun: 'd' },
   output: z.object({
     dryRun: z.boolean(),
@@ -342,9 +379,7 @@ order.command('cancel-all', {
         size: z.string(),
       }),
     ),
-    failed: z
-      .array(z.object({ oid: z.number(), error: z.string() }))
-      .optional(),
+    failed: z.array(z.object({ oid: z.number(), error: z.string() })).optional(),
   }),
   async run(c: any) {
     const guard = requireExchange(c, 'cancel orders')
@@ -392,7 +427,10 @@ order.command('cancel-all', {
     }
 
     if (cancels.length === 0) {
-      return c.error({ code: 'CANCEL_ALL_FAILED', message: 'Could not resolve asset IDs for any orders' })
+      return c.error({
+        code: 'CANCEL_ALL_FAILED',
+        message: 'Could not resolve asset IDs for any orders',
+      })
     }
 
     try {
@@ -419,12 +457,15 @@ order.command('cancel-all', {
         (_: any, i: number) => !failed.some((f) => f.oid === filtered[i].oid),
       )
 
-      return c.ok({
-        dryRun: false,
-        count: actualCancelled.length,
-        cancelled: actualCancelled,
-        ...(failed.length > 0 ? { failed } : {}),
-      })
+      return c.ok(
+        {
+          dryRun: false,
+          count: actualCancelled.length,
+          cancelled: actualCancelled,
+          ...(failed.length > 0 ? { failed } : {}),
+        },
+        { cta: { commands: [{ command: 'orders', description: 'Confirm no remaining orders' }] } },
+      )
     } catch (err) {
       return c.error({ code: 'CANCEL_ALL_FAILED', message: errorMessage(err) })
     }

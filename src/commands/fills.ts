@@ -11,6 +11,11 @@ export const fills = {
     limit: z.number().optional().describe('Max number of fills to show (default 50)'),
     days: z.number().optional().describe('Look back N days (default: all time)'),
   }),
+  examples: [
+    { args: { coin: 'BTC' }, options: { limit: 10 }, description: 'Last 10 BTC fills' },
+    { options: { days: 7 }, description: 'All fills from last 7 days' },
+  ],
+  hint: 'Use --days to filter by time range. Fills are aggregated by time.',
   alias: { limit: 'l', days: 'd' },
   output: z.object({
     fills: z.array(

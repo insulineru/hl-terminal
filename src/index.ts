@@ -23,7 +23,7 @@ const vars = z.object({
 })
 
 const cli = Cli.create('hl-terminal', {
-  version: '0.2.2',
+  version: '0.3.0',
   description:
     'Hyperliquid DEX trading CLI — read market state, manage accounts, and execute trades from the terminal or via AI agent (MCP)',
   options: z.object({
@@ -31,6 +31,14 @@ const cli = Cli.create('hl-terminal', {
   }),
   alias: { testnet: 't' },
   vars,
+  sync: {
+    suggestions: [
+      'Check BTC price: hl price BTC',
+      'View account balance: hl balance',
+      'Place a market buy: hl order create BTC buy 0.001',
+    ],
+    depth: 1,
+  },
 })
 
 // Account middleware — loads active account and injects InfoClient

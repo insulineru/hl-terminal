@@ -2,6 +2,7 @@ import { z } from 'incur'
 
 export const positions = {
   description: 'View open positions with entry price, size, PnL, leverage, liq price',
+  examples: [{ description: 'View all open perp positions' }],
   output: z.object({
     positions: z.array(
       z.object({

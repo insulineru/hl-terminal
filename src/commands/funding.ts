@@ -8,6 +8,11 @@ export const funding = {
       .optional()
       .describe('Coin symbol (e.g. BTC). If omitted, shows all current rates'),
   }),
+  examples: [
+    { args: { coin: 'BTC' }, description: 'BTC funding history (7 days)' },
+    { description: 'Current funding rates for all coins' },
+  ],
+  hint: 'Without a coin argument, fetches current rates for all markets (may take a few seconds).',
   output: z.object({
     rates: z.array(
       z.object({
