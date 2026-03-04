@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-03-03)
 Phase: 2 of 4 (Trade Execution) — COMPLETE
 Plan: 4 of 4 in current phase (02-01, 02-02, 02-03, 02-04 complete)
 Status: Plan 02-04 complete — UAT gaps closed: price as positional arg, examples/hint added, README updated
-Last activity: 2026-03-04 — Plan 02-04 executed (price positional arg, order create examples/hint, README Phase 2 docs)
+Last activity: 2026-03-04 - Completed quick task 1: Improve incur best practices — version fix, sync config, incur gen, examples, hints, success CTAs, typing
 
 Progress: [##########] 100% (Phase 1) | [##########] 100% (Phase 1.5) | [##########] 100% (Phase 2)
 
@@ -98,6 +98,12 @@ Recent decisions affecting current work:
 ### Pending Todos
 
 None.
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 1 | Improve incur best practices — version fix, sync config, incur gen, examples, hints, success CTAs, typing | 2026-03-04 | 038c09f | [1-improve-incur-best-practices-version-fix](./quick/1-improve-incur-best-practices-version-fix/) |
 
 ### Blockers/Concerns
 
