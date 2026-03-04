@@ -2,6 +2,6 @@
   "$schema": "https://unpkg.com/knip@5/schema.json",
   "entry": ["src/**/*.test.ts"],
   "project": ["src/**/*.ts"],
-  "ignore": ["src/lib/format.ts"],
+  "ignore": ["src/lib/format.ts", "src/incur.generated.ts"],
   "ignoreExportsUsedInFile": true
 }
