@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1
+
+### Patch Changes
+
+- Fix CLI version display — read version from package.json instead of hardcoding
+
 ## 0.3.0
 
 ### Minor Changes
