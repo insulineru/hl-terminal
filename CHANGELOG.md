@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.2
+
+### Patch Changes
+
+- Add release script with 1Password OTP support
+
 ## 0.3.1
 
 ### Patch Changes
