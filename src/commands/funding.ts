@@ -1,4 +1,5 @@
 import { z } from 'incur'
+import { listPerpMarkets, normalizePerpCoin } from '../lib/perps.js'
 
 export const funding = {
   description: 'View current funding rates or funding history for a specific coin',
@@ -24,7 +25,7 @@ export const funding = {
     ),
   }),
   async run(c: any) {
-    const coin = c.args.coin?.toUpperCase()
+    const coin = c.args.coin ? normalizePerpCoin(c.args.coin) : undefined
 
     if (coin) {
       // Funding history for specific coin (last 7 days)
@@ -46,8 +47,7 @@ export const funding = {
 
     // Current funding rates for all coins
     // Get meta for coin list, then fetch latest funding for each
-    const meta = await c.var.info.meta()
-    const coins = (meta.universe ?? []).map((m: any) => m.name)
+    const coins = (await listPerpMarkets(c.var.info)).map((market) => market.name)
 
     // Fetch funding for all coins in parallel (last 1 hour to get the latest entry)
     const startTime = Date.now() - 60 * 60 * 1000

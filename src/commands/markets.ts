@@ -1,8 +1,11 @@
 import { z } from 'incur'
+import { listPerpMarkets } from '../lib/perps.js'
 
 export const markets = {
-  description: 'List available markets with metadata (perps + spot)',
-  examples: [{ description: 'List all available perp markets' }],
+  description: 'List available perpetual markets across the main exchange and builder dexs',
+  examples: [
+    { description: 'List all available perpetual markets, including dex-qualified symbols' },
+  ],
   output: z.object({
     markets: z.array(
       z.object({
@@ -13,15 +16,11 @@ export const markets = {
     ),
   }),
   async run(c: any) {
-    const meta = await c.var.info.meta()
-
-    const marketList = (meta.universe ?? [])
-      .map((m: any) => ({
-        name: m.name ?? '',
-        szDecimals: m.szDecimals ?? 0,
-        maxLeverage: m.maxLeverage ?? 0,
-      }))
-      .sort((a: any, b: any) => a.name.localeCompare(b.name))
+    const marketList = (await listPerpMarkets(c.var.info)).map((m) => ({
+      name: m.name,
+      szDecimals: m.szDecimals,
+      maxLeverage: m.maxLeverage,
+    }))
 
     return c.ok({ markets: marketList })
   },
