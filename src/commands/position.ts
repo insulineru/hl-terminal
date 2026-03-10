@@ -5,7 +5,9 @@ import {
   errorMessage,
   parseOrderStatus,
   requireExchange,
+  normalizePerpCoin,
 } from '../lib/exchange.js'
+import { findUserPerpPosition, getPerpMidPrice } from '../lib/perps.js'
 
 export const position = Cli.create('position', {
   description: 'Manage position settings — leverage, take-profit, stop-loss',
@@ -49,7 +51,7 @@ position.command('leverage', {
       })
     }
 
-    const coin = c.args.coin.toUpperCase()
+    const coin = normalizePerpCoin(c.args.coin)
 
     let assetId: number
     try {
@@ -90,7 +92,7 @@ position.command('leverage', {
 
 /**
  * Shared helper for placing position-level TP or SL trigger orders.
- * Auto-detects position direction from clearinghouseState.
+ * Auto-detects position direction across all supported perp dexs.
  */
 async function placeTriggerOrder(
   c: any,
@@ -99,33 +101,30 @@ async function placeTriggerOrder(
   tpsl: 'tp' | 'sl',
   dryRun: boolean,
 ) {
+  const normalizedCoin = normalizePerpCoin(coin)
+
   // Fetch all independent data in parallel
-  const [resolvedAsset, state, mids] = await Promise.all([
-    resolveAsset(c.var.info, coin),
-    c.var.info.clearinghouseState({ user: c.var.address }),
-    c.var.info.allMids(),
+  const [resolvedAsset, position, midRaw] = await Promise.all([
+    resolveAsset(c.var.info, normalizedCoin),
+    findUserPerpPosition(c.var.info, c.var.address, normalizedCoin),
+    getPerpMidPrice(c.var.info, normalizedCoin),
   ])
 
   const { assetId, szDecimals } = resolvedAsset
 
-  // Auto-detect position direction
-  const posEntry = (state.assetPositions ?? []).find(
-    (ap: any) => ap.position?.coin?.toUpperCase() === coin,
-  )
-
-  if (!posEntry) {
+  if (!position) {
     return c.error({
       code: 'NO_POSITION',
-      message: `No open position for ${coin}`,
+      message: `No open position for ${normalizedCoin}`,
       cta: { commands: [{ command: 'positions', description: 'View open positions' }] },
     })
   }
 
-  const szi = parseFloat(posEntry.position?.szi ?? '0')
+  const szi = parseFloat(position.szi ?? '0')
   if (szi === 0) {
     return c.error({
       code: 'NO_POSITION',
-      message: `No open position for ${coin}`,
+      message: `No open position for ${normalizedCoin}`,
       cta: { commands: [{ command: 'positions', description: 'View open positions' }] },
     })
   }
@@ -137,8 +136,7 @@ async function placeTriggerOrder(
   const formattedTriggerPx = formatPrice(triggerPrice, szDecimals, 'perp')
 
   // Validate trigger price direction against current mid
-  const midRaw = mids[coin]
-  const mid = parseFloat(midRaw)
+  const mid = parseFloat(midRaw ?? '')
 
   if (!isNaN(mid)) {
     const triggerNum = parseFloat(formattedTriggerPx)
@@ -179,7 +177,7 @@ async function placeTriggerOrder(
   if (dryRun) {
     return c.ok({
       dryRun: true,
-      coin,
+      coin: normalizedCoin,
       triggerPrice: formattedTriggerPx,
       side,
       positionSide,
@@ -212,7 +210,7 @@ async function placeTriggerOrder(
     return c.ok(
       {
         dryRun: false,
-        coin,
+        coin: normalizedCoin,
         triggerPrice: formattedTriggerPx,
         side,
         positionSide,
@@ -258,7 +256,7 @@ position.command('tp', {
     try {
       return await placeTriggerOrder(
         c,
-        c.args.coin.toUpperCase(),
+        normalizePerpCoin(c.args.coin),
         c.options.price,
         'tp',
         c.options.dryRun,
@@ -289,7 +287,7 @@ position.command('sl', {
     try {
       return await placeTriggerOrder(
         c,
-        c.args.coin.toUpperCase(),
+        normalizePerpCoin(c.args.coin),
         c.options.price,
         'sl',
         c.options.dryRun,

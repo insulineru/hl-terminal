@@ -1,8 +1,9 @@
 import { z } from 'incur'
+import { listUserPerpPositions } from '../lib/perps.js'
 
 export const positions = {
-  description: 'View open positions with entry price, size, PnL, leverage, liq price',
-  examples: [{ description: 'View all open perp positions' }],
+  description: 'View open perpetual positions across the main exchange and builder dexs',
+  examples: [{ description: 'View all open perpetual positions' }],
   output: z.object({
     positions: z.array(
       z.object({
@@ -18,27 +19,7 @@ export const positions = {
   }),
   async run(c: any) {
     const address = c.var.address
-    const state = await c.var.info.clearinghouseState({ user: address })
-
-    // Filter to non-zero positions
-    const openPositions = (state.assetPositions ?? [])
-      .filter((ap: any) => {
-        const szi = parseFloat(ap.position?.szi ?? '0')
-        return szi !== 0
-      })
-      .map((ap: any) => {
-        const pos = ap.position
-        const szi = parseFloat(pos.szi ?? '0')
-        return {
-          coin: pos.coin ?? '',
-          size: pos.szi ?? '0',
-          entryPx: pos.entryPx ?? '0',
-          unrealizedPnl: pos.unrealizedPnl ?? '0',
-          leverage: pos.leverage?.value ?? '0',
-          liquidationPx: pos.liquidationPx ?? '0',
-          side: szi >= 0 ? 'Long' : 'Short',
-        }
-      })
+    const openPositions = await listUserPerpPositions(c.var.info, address)
 
     return c.ok({ positions: openPositions })
   },
