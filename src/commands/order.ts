@@ -4,11 +4,12 @@ import {
   buildAssetMap,
   formatPrice,
   formatSize,
-  formatSide,
   errorMessage,
   parseOrderStatus,
   requireExchange,
+  normalizePerpCoin,
 } from '../lib/exchange.js'
+import { getPerpMidPrice, listUserPerpOpenOrders } from '../lib/perps.js'
 
 const TIF_MAP: Record<string, 'Gtc' | 'Ioc' | 'Alo'> = {
   GTC: 'Gtc',
@@ -70,7 +71,7 @@ order.command('create', {
     const guard = requireExchange(c, 'place orders')
     if (guard) return guard
 
-    const coin = c.args.coin.toUpperCase()
+    const coin = normalizePerpCoin(c.args.coin)
 
     let assetId: number
     let szDecimals: number
@@ -116,9 +117,9 @@ order.command('create', {
       orderType = 'market'
       tifStr = 'FrontendMarket'
 
-      let allMids: Record<string, string>
+      let mid: string | undefined
       try {
-        allMids = await c.var.info.allMids()
+        mid = await getPerpMidPrice(c.var.info, coin)
       } catch (err) {
         return c.error({
           code: 'PRICE_FETCH_FAILED',
@@ -126,7 +127,6 @@ order.command('create', {
         })
       }
 
-      const mid = allMids[coin]
       if (!mid) {
         return c.error({ code: 'PRICE_NOT_FOUND', message: `No mid price found for ${coin}` })
       }
@@ -300,14 +300,14 @@ order.command('cancel', {
     const guard = requireExchange(c, 'cancel orders')
     if (guard) return guard
 
-    // Fetch open orders (with fallback) and meta in parallel
+    // Fetch open orders and encoded asset IDs in parallel
     let openOrders: any[]
     let assetMap: Map<string, number>
     try {
-      const ordersPromise = c.var.info
-        .frontendOpenOrders({ user: c.var.address })
-        .catch(() => c.var.info.openOrders({ user: c.var.address }))
-      ;[openOrders, assetMap] = await Promise.all([ordersPromise, buildAssetMap(c.var.info)])
+      ;[openOrders, assetMap] = await Promise.all([
+        listUserPerpOpenOrders(c.var.info, c.var.address),
+        buildAssetMap(c.var.info),
+      ])
     } catch (err) {
       return c.error({ code: 'FETCH_ORDERS_FAILED', message: errorMessage(err) })
     }
@@ -324,9 +324,9 @@ order.command('cancel', {
     const cancelledDetails = {
       oid: target.oid,
       coin: target.coin,
-      side: formatSide(target.side),
-      size: target.sz ?? '0',
-      price: target.limitPx ?? target.px ?? '0',
+      side: target.side,
+      size: target.size ?? '0',
+      price: target.price ?? '0',
     }
 
     if (c.options.dryRun) {
@@ -385,22 +385,22 @@ order.command('cancel-all', {
     const guard = requireExchange(c, 'cancel orders')
     if (guard) return guard
 
-    // Fetch open orders (with fallback) and meta in parallel
+    // Fetch open orders and encoded asset IDs in parallel
     let openOrders: any[]
     let assetMap: Map<string, number>
     try {
-      const ordersPromise = c.var.info
-        .frontendOpenOrders({ user: c.var.address })
-        .catch(() => c.var.info.openOrders({ user: c.var.address }))
-      ;[openOrders, assetMap] = await Promise.all([ordersPromise, buildAssetMap(c.var.info)])
+      ;[openOrders, assetMap] = await Promise.all([
+        listUserPerpOpenOrders(c.var.info, c.var.address),
+        buildAssetMap(c.var.info),
+      ])
     } catch (err) {
       return c.error({ code: 'FETCH_ORDERS_FAILED', message: errorMessage(err) })
     }
 
     // Filter by coin if provided
-    const filterCoin = c.options.coin?.toUpperCase()
+    const filterCoin = c.options.coin ? normalizePerpCoin(c.options.coin) : undefined
     const filtered = filterCoin
-      ? openOrders.filter((o: any) => o.coin?.toUpperCase() === filterCoin)
+      ? openOrders.filter((o: any) => normalizePerpCoin(o.coin ?? '') === filterCoin)
       : openOrders
 
     if (filtered.length === 0) {
@@ -410,8 +410,8 @@ order.command('cancel-all', {
     const cancelledSummary = filtered.map((o: any) => ({
       oid: o.oid,
       coin: o.coin,
-      side: formatSide(o.side),
-      size: o.sz ?? '0',
+      side: o.side,
+      size: o.size ?? '0',
     }))
 
     if (c.options.dryRun) {

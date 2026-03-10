@@ -1,8 +1,14 @@
 import type { InfoClient } from '@nktkas/hyperliquid'
+import {
+  buildPerpMarketRegistry,
+  findPerpMarket,
+  listPerpMarkets,
+  normalizePerpCoin,
+} from './perps.js'
 
 /**
- * Resolve a coin symbol (e.g. "BTC") to its asset ID and size decimals.
- * The asset ID is the coin's index in meta.universe — required by ExchangeClient actions.
+ * Resolve a perp market symbol (e.g. "BTC" or "xyz:BRENTOIL") to its asset ID and size decimals.
+ * Supports main perps and builder dex perps using Hyperliquid's encoded asset IDs.
  *
  * @throws Error with available coins hint if the coin is not found.
  */
@@ -10,38 +16,29 @@ export async function resolveAsset(
   info: InfoClient,
   coin: string,
 ): Promise<{ assetId: number; szDecimals: number }> {
-  const upperCoin = coin.toUpperCase()
-  const meta = await info.meta()
+  const market = await findPerpMarket(info, coin)
 
-  const index = meta.universe.findIndex((asset) => asset.name.toUpperCase() === upperCoin)
-
-  if (index === -1) {
-    const available = meta.universe.map((a) => a.name).join(', ')
+  if (!market) {
+    const available = (await listPerpMarkets(info)).map((a) => a.name).join(', ')
     throw new Error(
       `Coin "${coin}" not found. Run \`hl markets\` to see available markets.\nAvailable: ${available}`,
     )
   }
 
-  const asset = meta.universe[index]
-  if (!asset) {
-    throw new Error(`Coin "${coin}" not found in meta.universe`)
-  }
-
-  return { assetId: index, szDecimals: asset.szDecimals }
+  return { assetId: market.assetId, szDecimals: market.szDecimals }
 }
 
 /**
- * Build a map of coin name -> asset index from meta.universe.
- * Fetches meta once for bulk resolution (e.g. cancel-all).
+ * Build a map of coin name -> encoded asset ID for all supported perp markets.
  */
 export async function buildAssetMap(info: InfoClient): Promise<Map<string, number>> {
-  const meta = await info.meta()
   const map = new Map<string, number>()
-  meta.universe.forEach((a, i) => {
-    map.set(a.name, i)
-  })
+  const registry = await buildPerpMarketRegistry(info)
+  registry.forEach((market, coin) => map.set(coin, market.assetId))
   return map
 }
+
+export { normalizePerpCoin }
 
 /**
  * Extract a message string from an unknown error.
