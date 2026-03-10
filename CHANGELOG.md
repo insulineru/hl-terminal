@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.2
+
+### Patch Changes
+
+- Add release script with 1Password OTP support
+
+## 0.3.1
+
+### Patch Changes
+
+- Fix CLI version display — read version from package.json instead of hardcoding
+
 ## 0.3.0
 
 ### Minor Changes

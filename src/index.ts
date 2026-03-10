@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import { createRequire } from 'node:module'
 import { Cli, z, middleware } from 'incur'
 import { loadActiveAccount } from './lib/config.js'
 import { createInfoClient, createExchangeClient } from './lib/client.js'
@@ -13,6 +14,9 @@ import { fills } from './commands/fills.js'
 import { order } from './commands/order.js'
 import { position } from './commands/position.js'
 
+const require = createRequire(import.meta.url)
+const { version } = require('../package.json') as { version: string }
+
 // Vars schema for middleware injection
 const vars = z.object({
   info: z.any().optional(),
@@ -23,7 +27,7 @@ const vars = z.object({
 })
 
 const cli = Cli.create('hl-terminal', {
-  version: '0.3.0',
+  version,
   description:
     'Hyperliquid DEX trading CLI — read market state, manage accounts, and execute trades from the terminal or via AI agent (MCP)',
   options: z.object({
