@@ -7,19 +7,40 @@ declare module 'incur' {
       'account switch': { args: { name: string }; options: {} }
       'account watch': { args: { address: string }; options: { name: string } }
       balance: { args: {}; options: {} }
-      fills: { args: { coin: string }; options: { limit: number; days: number } }
-      funding: { args: { coin: string }; options: {} }
+      candles: {
+        args: { coin: string }
+        options: {
+          interval?:
+            | '1m'
+            | '3m'
+            | '5m'
+            | '15m'
+            | '30m'
+            | '1h'
+            | '2h'
+            | '4h'
+            | '8h'
+            | '12h'
+            | '1d'
+            | '3d'
+            | '1w'
+            | '1M'
+          limit?: number
+        }
+      }
+      fills: { args: { coin?: string }; options: { limit?: number; days?: number } }
+      funding: { args: { coin?: string }; options: {} }
       markets: { args: {}; options: {} }
       'order cancel': { args: { oid: number }; options: { dryRun: boolean } }
-      'order cancel-all': { args: {}; options: { coin: string; dryRun: boolean } }
+      'order cancel-all': { args: {}; options: { coin?: string; dryRun: boolean } }
       'order create': {
-        args: { coin: string; side: 'buy' | 'sell'; size: string; price: string }
+        args: { coin: string; side: 'buy' | 'sell'; size: string; price?: string }
         options: {
           tif: 'GTC' | 'IOC' | 'ALO'
           slippage: number
           reduceOnly: boolean
-          tp: string
-          sl: string
+          tp?: string
+          sl?: string
           dryRun: boolean
         }
       }

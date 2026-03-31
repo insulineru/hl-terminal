@@ -5,6 +5,7 @@
     "changeset:version": "changeset version",
     "check": "oxlint --fix --ignore-pattern package.json && oxfmt src/",
     "check:types": "tsc -b",
+    "gen": "incur gen --output src/incur.generated.ts",
     "dev": "zile dev",
     "knip": "knip",
     "release": "zile publish:prepare && changeset publish && zile publish:post",
@@ -65,7 +66,7 @@
   },
   "dependencies": {
     "@nktkas/hyperliquid": "^0.32.1",
-    "incur": "^0.1.12",
+    "incur": "^0.3.13",
     "viem": "^2.46.3"
   }
 }

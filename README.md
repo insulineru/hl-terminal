@@ -67,15 +67,18 @@ hl-terminal position leverage BTC 10
 
 ### Market Data
 
-| Command             | Description                                  |
-| ------------------- | -------------------------------------------- |
-| `hl-terminal price <coin>`   | Current mid-price for a coin                 |
-| `hl-terminal balance`        | Perps margin + spot wallet balance           |
-| `hl-terminal positions`      | Open positions with PnL, leverage, liq price |
-| `hl-terminal orders`         | Open orders with side, size, price, type     |
-| `hl-terminal markets`        | Available markets with metadata              |
-| `hl-terminal funding [coin]` | Current funding rates or history for a coin  |
-| `hl-terminal fills [coin]`   | Trade history with time range and pagination |
+| Command | Description |
+| --- | --- |
+| `hl-terminal price <coin>` | Current mid-price for a coin |
+| `hl-terminal balance` | Perps margin + spot wallet balance |
+| `hl-terminal positions` | Open positions with PnL, leverage, liq price |
+| `hl-terminal orders` | Open orders with side, size, price, type |
+| `hl-terminal markets` | Available markets with metadata |
+| `hl-terminal funding [coin]` | Current funding rates or history for a coin |
+| `hl-terminal fills [coin]` | Trade history with optional `--coin` filter, time range (`--days`), and pagination |
+| `hl-terminal candles <coin>` | OHLCV price history (`--interval 1h`, `--limit 100`) |
+
+> **DEX markets**: All commands support HIP-3 qualified tickers like `xyz:BRENTOIL`, `abc:USA500` in addition to standard coins like `BTC`, `ETH`.
 
 ### Trade Execution
 
@@ -95,14 +98,26 @@ hl-terminal position leverage BTC 10
 
 ### Global Options
 
-| Option          | Description            |
-| --------------- | ---------------------- |
-| `--testnet, -t` | Use testnet network    |
-| `--json`        | Output as JSON         |
-| `--mcp`         | Run as MCP server      |
-| `--llms`        | Print command manifest |
-| `--help`        | Show help              |
-| `--version`     | Show version           |
+| Option | Description |
+| --- | --- |
+| `--testnet, -t` | Use testnet network |
+| `--format <fmt>` | Output format: `toon` (default), `json`, `yaml`, `md`, `jsonl` |
+| `--json` | Shorthand for `--format json` |
+| `--filter-output <keys>` | Filter output by key paths (e.g. `coin,mid`) |
+| `--verbose` | Show full output envelope |
+| `--mcp` | Run as MCP server |
+| `--llms` | Print LLM-readable command manifest |
+| `--schema` | Show JSON Schema for a command |
+| `--help` | Show help |
+| `--version` | Show version |
+
+### Agent Integration
+
+| Command | Description |
+| --- | --- |
+| `hl-terminal mcp add` | Register as MCP server for AI agents |
+| `hl-terminal skills add` | Sync skill files to agents |
+| `hl-terminal completions` | Generate shell completion script |
 
 ## MCP Server
 
