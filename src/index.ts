@@ -111,5 +111,3 @@ cli.command(order)
 cli.command(position)
 
 cli.serve()
-
-export default cli
