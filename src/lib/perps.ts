@@ -47,6 +47,23 @@ function getCoinDex(coin: string): string | undefined {
   return coin.slice(0, delimiterIndex)
 }
 
+function getRawPerpCoinName(coin: string): string {
+  const normalizedCoin = normalizePerpCoin(coin)
+  const delimiterIndex = normalizedCoin.indexOf(':')
+  if (delimiterIndex === -1) return normalizedCoin
+  return normalizedCoin.slice(delimiterIndex + 1)
+}
+
+function qualifyPerpCoin(dex: string | undefined, coin: string): string {
+  const normalizedCoin = normalizePerpCoin(coin)
+
+  if (!dex) {
+    return normalizedCoin
+  }
+
+  return `${dex.toLowerCase()}:${getRawPerpCoinName(normalizedCoin)}`
+}
+
 async function listPerpDexs(info: InfoClient): Promise<DexMeta[]> {
   try {
     const dexs = await info.perpDexs()
@@ -85,8 +102,10 @@ export async function buildPerpMarketRegistry(info: InfoClient): Promise<Map<str
     const baseAssetId = 110000 + dexOffset * 10000
 
     for (const [index, asset] of (meta.universe ?? []).entries()) {
-      registry.set(asset.name, {
-        name: asset.name,
+      const qualifiedName = qualifyPerpCoin(dex, asset.name)
+
+      registry.set(qualifiedName, {
+        name: qualifiedName,
         szDecimals: asset.szDecimals ?? 0,
         maxLeverage: asset.maxLeverage ?? 0,
         assetId: baseAssetId + index,
@@ -116,19 +135,26 @@ export async function getPerpMidPrice(info: InfoClient, coin: string): Promise<s
   const normalizedCoin = normalizePerpCoin(coin)
   const dex = getCoinDex(normalizedCoin)
   const mids = dex ? await info.allMids({ dex }) : await info.allMids()
-  return mids[normalizedCoin]
+  const rawCoinName = getRawPerpCoinName(normalizedCoin)
+  return mids[rawCoinName] ?? mids[normalizedCoin]
+}
+
+type DexQueryResult<T> = {
+  dex: string | undefined
+  data: T
 }
 
 async function listPerpDexQueries<T>(
   info: InfoClient,
   query: (dex?: string) => Promise<T>,
-): Promise<T[]> {
+): Promise<DexQueryResult<T>[]> {
   const dexs = await listPerpDexs(info)
-  const results = await Promise.allSettled([
-    query(undefined),
-    ...dexs.map((dex) => query(dex.name)),
-  ])
-  return results.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : []))
+  const dexNames = [undefined, ...dexs.map((dex) => dex.name)]
+  const results = await Promise.allSettled(dexNames.map((dex) => query(dex)))
+
+  return results.flatMap((result, index) =>
+    result.status === 'fulfilled' ? [{ dex: dexNames[index], data: result.value }] : [],
+  )
 }
 
 async function listUserPerpRawPositions(info: InfoClient, address: string): Promise<RawPosition[]> {
@@ -138,12 +164,12 @@ async function listUserPerpRawPositions(info: InfoClient, address: string): Prom
       : info.clearinghouseState({ user: address }),
   )
 
-  return states.flatMap((state: any) =>
-    (state.assetPositions ?? [])
+  return states.flatMap(({ dex, data: state }) =>
+    ((state as any).assetPositions ?? [])
       .map((ap: any) => ap.position)
       .filter((position: any) => parseFloat(position?.szi ?? '0') !== 0)
       .map((position: any) => ({
-        coin: position.coin ?? '',
+        coin: qualifyPerpCoin(dex, position.coin ?? ''),
         szi: position.szi ?? '0',
         entryPx: position.entryPx ?? '0',
         unrealizedPnl: position.unrealizedPnl ?? '0',
@@ -202,12 +228,14 @@ export async function listUserPerpOpenOrders(
 ): Promise<RawOrder[]> {
   const orderSets = await listPerpDexQueries(info, (dex) => fetchOrdersForDex(info, address, dex))
 
-  return orderSets.flat().map((order: any) => ({
-    oid: order.oid ?? 0,
-    coin: order.coin ?? '',
-    side: formatSide(order.side ?? ''),
-    size: order.sz ?? '0',
-    price: order.limitPx ?? order.px ?? '0',
-    orderType: order.orderType ?? 'Limit',
-  }))
+  return orderSets.flatMap(({ dex, data: orders }) =>
+    (orders as any[]).map((order: any) => ({
+      oid: order.oid ?? 0,
+      coin: qualifyPerpCoin(dex, order.coin ?? ''),
+      side: formatSide(order.side ?? ''),
+      size: order.sz ?? '0',
+      price: order.limitPx ?? order.px ?? '0',
+      orderType: order.orderType ?? 'Limit',
+    })),
+  )
 }
