@@ -1,5 +1,6 @@
 import { z } from 'incur'
 import { formatSide } from '../lib/exchange.js'
+import { normalizePerpCoin } from '../lib/perps.js'
 
 export const fills = {
   description:
@@ -34,7 +35,7 @@ export const fills = {
   async run(c: any) {
     const address = c.var.address
     const limit = c.options.limit ?? 50
-    const coin = c.args.coin?.toUpperCase()
+    const coin = c.args.coin ? normalizePerpCoin(c.args.coin) : undefined
 
     // Use userFillsByTime for full history with pagination
     const days = c.options.days
@@ -49,7 +50,7 @@ export const fills = {
 
     let filtered = rawFills ?? []
     if (coin) {
-      filtered = filtered.filter((f: any) => f.coin === coin)
+      filtered = filtered.filter((f: any) => normalizePerpCoin(f.coin) === coin)
     }
 
     const total = filtered.length
