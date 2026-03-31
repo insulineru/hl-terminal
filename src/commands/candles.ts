@@ -37,12 +37,6 @@ const INTERVAL_MS: Record<CandleInterval, number> = {
   '1M': 30 * 24 * 60 * 60 * 1000,
 }
 
-function getCandleApiCoin(coin: string): string {
-  const delimiterIndex = coin.indexOf(':')
-  if (delimiterIndex === -1) return coin
-  return coin.slice(delimiterIndex + 1)
-}
-
 export const candles = {
   description: 'View OHLCV candle history for a perpetual market',
   args: z.object({
@@ -92,7 +86,7 @@ export const candles = {
     let rawCandles: any[]
     try {
       rawCandles = await c.var.info.candleSnapshot({
-        coin: getCandleApiCoin(coin),
+        coin,
         interval,
         startTime,
         endTime: now,
@@ -100,7 +94,7 @@ export const candles = {
     } catch {
       return c.error({
         code: 'CANDLES_UNAVAILABLE',
-        message: `Candle data not available for ${coin}. Builder-dex markets may not support historical candles.`,
+        message: `Candle data not available for ${coin}`,
         cta: {
           commands: [{ command: `price ${coin}`, description: 'Check current price instead' }],
           description: 'Try:',
