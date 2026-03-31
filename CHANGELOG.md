@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.1
+
+### Patch Changes
+
+- ba81143: Fix: CLI no longer starts an unwanted development server on localhost:3000 when running commands
+
 ## 0.4.0
 
 ### Minor Changes
