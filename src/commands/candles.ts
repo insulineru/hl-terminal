@@ -89,12 +89,24 @@ export const candles = {
     const now = Date.now()
     const startTime = now - limit * intervalMs
 
-    const rawCandles = await c.var.info.candleSnapshot({
-      coin: getCandleApiCoin(coin),
-      interval,
-      startTime,
-      endTime: now,
-    })
+    let rawCandles: any[]
+    try {
+      rawCandles = await c.var.info.candleSnapshot({
+        coin: getCandleApiCoin(coin),
+        interval,
+        startTime,
+        endTime: now,
+      })
+    } catch {
+      return c.error({
+        code: 'CANDLES_UNAVAILABLE',
+        message: `Candle data not available for ${coin}. Builder-dex markets may not support historical candles.`,
+        cta: {
+          commands: [{ command: `price ${coin}`, description: 'Check current price instead' }],
+          description: 'Try:',
+        },
+      })
+    }
 
     const candles = (rawCandles ?? []).map((candle: any) => ({
       time: new Date(candle.t).toISOString().replace('T', ' ').slice(0, 19),
