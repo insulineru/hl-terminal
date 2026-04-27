@@ -63,7 +63,10 @@ hl-terminal orders
 # Expected: orders array with oid, coin, side, size, origSize, sizeMode, price,
 # orderType, reduceOnly, isTrigger, isPositionTpsl, trigger fields, tif, cloid.
 # Position-level TP/SL orders may have size/origSize "0.0" from the API and
-# sizeMode "position"; currentPositionSize is derived from open positions when available.
+# sizeMode "position"; currentPositionSize is derived as an absolute size from
+# open positions when available. If frontendOpenOrders is unavailable and the
+# command falls back to openOrders, Hyperliquid may not provide enough trigger
+# metadata to identify position-level TP/SL orders.
 ```
 
 ### balance

@@ -221,6 +221,13 @@ function formatSide(code: string): string {
   return code
 }
 
+function formatAbsoluteSize(size: string | undefined): string | undefined {
+  if (size === undefined || size.trim() === '') return undefined
+  const numericSize = Number(size)
+  if (!Number.isFinite(numericSize)) return size
+  return String(Math.abs(numericSize))
+}
+
 async function fetchOrdersForDex(info: InfoClient, address: string, dex?: string): Promise<any[]> {
   try {
     return dex
@@ -256,7 +263,9 @@ export async function listUserPerpOpenOrders(
           ? 'position'
           : 'explicit'
       const currentPositionSize =
-        sizeMode === 'position' ? positionsByCoin.get(normalizePerpCoin(coin)) : undefined
+        sizeMode === 'position'
+          ? formatAbsoluteSize(positionsByCoin.get(normalizePerpCoin(coin)))
+          : undefined
 
       return {
         oid: order.oid ?? 0,
