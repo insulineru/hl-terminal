@@ -72,7 +72,7 @@ hl-terminal position leverage BTC 10
 | `hl-terminal price <coin>` | Current mid-price for a coin |
 | `hl-terminal balance` | Perps margin + spot wallet balance |
 | `hl-terminal positions` | Open positions with PnL, leverage, liq price |
-| `hl-terminal orders` | Open orders with side, size, price, type |
+| `hl-terminal orders` | Open orders with side, size, original size, trigger/TP-SL context, price, type |
 | `hl-terminal markets` | Available markets with metadata |
 | `hl-terminal funding [coin]` | Current funding rates or history for a coin |
 | `hl-terminal fills [coin]` | Trade history with optional `--coin` filter, time range (`--days`), and pagination |

@@ -24,8 +24,19 @@ type RawOrder = {
   coin: string
   side: string
   size: string
+  origSize: string
+  sizeMode: 'explicit' | 'position'
   price: string
   orderType: string
+  reduceOnly: boolean
+  isTrigger: boolean
+  isPositionTpsl: boolean
+  triggerPx?: string
+  triggerCondition?: string
+  tif?: string
+  cloid?: string
+  currentPositionSize?: string
+  currentPositionSizeSource?: 'derivedFromPosition'
 }
 
 export function normalizePerpCoin(coin: string): string {
@@ -210,6 +221,13 @@ function formatSide(code: string): string {
   return code
 }
 
+function formatAbsoluteSize(size: string | undefined): string | undefined {
+  if (size === undefined || size.trim() === '') return undefined
+  const numericSize = Number(size)
+  if (!Number.isFinite(numericSize)) return size
+  return String(Math.abs(numericSize))
+}
+
 async function fetchOrdersForDex(info: InfoClient, address: string, dex?: string): Promise<any[]> {
   try {
     return dex
@@ -226,16 +244,52 @@ export async function listUserPerpOpenOrders(
   info: InfoClient,
   address: string,
 ): Promise<RawOrder[]> {
-  const orderSets = await listPerpDexQueries(info, (dex) => fetchOrdersForDex(info, address, dex))
+  const [orderSets, positions] = await Promise.all([
+    listPerpDexQueries(info, (dex) => fetchOrdersForDex(info, address, dex)),
+    listUserPerpRawPositions(info, address),
+  ])
+  const positionsByCoin = new Map(
+    positions.map((position) => [normalizePerpCoin(position.coin), position.szi]),
+  )
 
   return orderSets.flatMap(({ dex, data: orders }) =>
-    (orders as any[]).map((order: any) => ({
-      oid: order.oid ?? 0,
-      coin: qualifyPerpCoin(dex, order.coin ?? ''),
-      side: formatSide(order.side ?? ''),
-      size: order.sz ?? '0',
-      price: order.limitPx ?? order.px ?? '0',
-      orderType: order.orderType ?? 'Limit',
-    })),
+    (orders as any[]).map((order: any) => {
+      const coin = qualifyPerpCoin(dex, order.coin ?? '')
+      const size = order.sz ?? '0'
+      const origSize = order.origSz ?? size
+      const isPositionTpsl = Boolean(order.isPositionTpsl)
+      const sizeMode =
+        isPositionTpsl && parseFloat(size) === 0 && parseFloat(origSize) === 0
+          ? 'position'
+          : 'explicit'
+      const currentPositionSize =
+        sizeMode === 'position'
+          ? formatAbsoluteSize(positionsByCoin.get(normalizePerpCoin(coin)))
+          : undefined
+
+      return {
+        oid: order.oid ?? 0,
+        coin,
+        side: formatSide(order.side ?? ''),
+        size,
+        origSize,
+        sizeMode,
+        price: order.limitPx ?? order.px ?? '0',
+        orderType: order.orderType ?? 'Limit',
+        reduceOnly: Boolean(order.reduceOnly),
+        isTrigger: Boolean(order.isTrigger),
+        isPositionTpsl,
+        triggerPx: order.triggerPx,
+        triggerCondition: order.triggerCondition,
+        tif: order.tif,
+        cloid: order.cloid,
+        ...(currentPositionSize
+          ? {
+              currentPositionSize,
+              currentPositionSizeSource: 'derivedFromPosition' as const,
+            }
+          : {}),
+      }
+    }),
   )
 }
