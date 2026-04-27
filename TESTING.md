@@ -60,7 +60,10 @@ hl-terminal positions
 ```bash
 # List open orders
 hl-terminal orders
-# Expected: orders array with oid, coin, side, size, price, orderType
+# Expected: orders array with oid, coin, side, size, origSize, sizeMode, price,
+# orderType, reduceOnly, isTrigger, isPositionTpsl, trigger fields, tif, cloid.
+# Position-level TP/SL orders may have size/origSize "0.0" from the API and
+# sizeMode "position"; currentPositionSize is derived from open positions when available.
 ```
 
 ### balance

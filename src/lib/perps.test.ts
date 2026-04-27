@@ -163,19 +163,89 @@ describe('listUserPerpOpenOrders', () => {
     expect(orders).toEqual([
       {
         coin: 'BTC',
+        cloid: undefined,
+        isPositionTpsl: false,
+        isTrigger: false,
         oid: 1,
         orderType: 'Limit',
+        origSize: '0.01',
         price: '95000',
+        reduceOnly: false,
         side: 'Buy',
         size: '0.01',
+        sizeMode: 'explicit',
+        tif: undefined,
+        triggerCondition: undefined,
+        triggerPx: undefined,
       },
       {
         coin: 'xyz:BRENTOIL',
+        cloid: undefined,
+        isPositionTpsl: false,
+        isTrigger: false,
         oid: 2,
         orderType: 'Limit',
+        origSize: '3',
         price: '71',
+        reduceOnly: false,
         side: 'Sell',
         size: '3',
+        sizeMode: 'explicit',
+        tif: undefined,
+        triggerCondition: undefined,
+        triggerPx: undefined,
+      },
+    ])
+  })
+
+  test('marks zero-size position TP/SL trigger orders as dynamic position-size orders', async () => {
+    const orders = await listUserPerpOpenOrders(
+      createInfoMock({
+        async frontendOpenOrders(params: { user: string; dex?: string }) {
+          if (params.dex) return []
+
+          return [
+            {
+              oid: 3,
+              coin: 'BTC',
+              side: 'A',
+              sz: '0.0',
+              origSz: '0.0',
+              limitPx: '0',
+              orderType: 'Stop Market',
+              isTrigger: true,
+              isPositionTpsl: true,
+              reduceOnly: true,
+              triggerPx: '90000',
+              triggerCondition: 'Triggered below 90000',
+              tif: 'FrontendMarket',
+              cloid: '0xabc',
+            },
+          ]
+        },
+      }) as any,
+      '0x123',
+    )
+
+    expect(orders).toEqual([
+      {
+        coin: 'BTC',
+        cloid: '0xabc',
+        currentPositionSize: '0.01',
+        currentPositionSizeSource: 'derivedFromPosition',
+        isPositionTpsl: true,
+        isTrigger: true,
+        oid: 3,
+        orderType: 'Stop Market',
+        origSize: '0.0',
+        price: '0',
+        reduceOnly: true,
+        side: 'Sell',
+        size: '0.0',
+        sizeMode: 'position',
+        tif: 'FrontendMarket',
+        triggerCondition: 'Triggered below 90000',
+        triggerPx: '90000',
       },
     ])
   })
