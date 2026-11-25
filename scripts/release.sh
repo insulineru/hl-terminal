@@ -49,6 +49,9 @@ trap 'mv package.json.bak package.json 2>/dev/null || true' EXIT
 echo "→ Building package..."
 bun run build
 
+echo "→ Pointing the published bin at node..."
+node scripts/fix-dist-shebang.mjs
+
 echo "→ Normalizing published package.json (bin paths)..."
 npm pkg fix
 

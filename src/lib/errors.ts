@@ -37,12 +37,18 @@ function responseOf(err: unknown): HttpResponseLike | undefined {
   return response as HttpResponseLike
 }
 
+function messageIs429(message: string): boolean {
+  const trimmed = message.trim()
+  // Status line with an empty statusText is "429" or "429 - null", not "Too Many Requests".
+  if (/^429\b/.test(trimmed)) return true
+  return /\b429\b/.test(trimmed) && /too many requests/i.test(trimmed)
+}
+
 /** True when Hyperliquid (or a wrapper around its HTTP error) answered 429. */
 export function isHyperliquidRateLimit(err: unknown): boolean {
   for (const item of causeChain(err)) {
     if (responseOf(item)?.status === 429) return true
-    const message = errorMessage(item)
-    if (/\b429\b/.test(message) && /too many requests/i.test(message)) return true
+    if (messageIs429(errorMessage(item))) return true
   }
   return false
 }
@@ -50,7 +56,7 @@ export function isHyperliquidRateLimit(err: unknown): boolean {
 function retryHint(err: unknown): string {
   for (const item of causeChain(err)) {
     const headers = responseOf(item)?.headers
-    const raw = headers?.get?.('retry-after')
+    const raw = headers?.get?.('retry-after')?.trim()
     if (!raw) continue
     const seconds = Number(raw)
     if (Number.isFinite(seconds) && seconds >= 0) {

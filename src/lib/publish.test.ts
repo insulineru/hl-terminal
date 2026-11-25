@@ -6,6 +6,7 @@ const pkg = JSON.parse(readFileSync(new URL('../../package.json', import.meta.ur
   dependencies: { incur: string }
   scripts: { release: string }
 }
+const releaseScript = readFileSync(new URL('../../scripts/release.sh', import.meta.url), 'utf8')
 
 describe('publish manifest', () => {
   test('pins incur to the exact release whose MCP transport loads', () => {
@@ -14,8 +15,10 @@ describe('publish manifest', () => {
 
   test('keeps the ./src bin prefix zile needs, and fixes bins at publish time', () => {
     // npm pkg fix strips "./". Doing that here makes zile emit dist/src/index.js.
-    // The release scripts run npm pkg fix after zile rewrites the publish manifest.
+    // scripts/release.sh runs npm pkg fix after the build and restores package.json on failure.
     expect(pkg.bin['hl-terminal']).toBe('./src/index.ts')
-    expect(pkg.scripts.release).toContain('npm pkg fix')
+    expect(pkg.scripts.release).toBe('./scripts/release.sh')
+    expect(releaseScript).toContain('npm pkg fix')
+    expect(releaseScript).toContain('package.json.bak package.json')
   })
 })

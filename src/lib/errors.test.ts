@@ -39,6 +39,19 @@ describe('commandError', () => {
     })
   })
 
+  test('treats status 429 as rate limited when statusText is empty', () => {
+    const err = Object.assign(new Error('429 - null'), {
+      response: { status: 429, statusText: '', headers: { get: () => '  2  ' } },
+    })
+    expect(isHyperliquidRateLimit(err)).toBe(true)
+    expect(commandError(err, 'ASSET_NOT_FOUND').message).toContain('Retry after 2 seconds.')
+  })
+
+  test('recognizes a bare 429 status line with no status text', () => {
+    expect(isHyperliquidRateLimit(new Error('429'))).toBe(true)
+    expect(isHyperliquidRateLimit(new Error('429 - null'))).toBe(true)
+  })
+
   test('leaves other failures on the caller code', () => {
     expect(commandError(new Error('Coin "NOPE" not found'), 'ASSET_NOT_FOUND')).toEqual({
       code: 'ASSET_NOT_FOUND',

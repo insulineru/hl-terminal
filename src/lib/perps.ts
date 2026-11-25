@@ -110,7 +110,10 @@ export async function buildPerpMarketRegistry(info: InfoClient): Promise<Map<str
   )
 
   for (const result of dexResults) {
-    if (result.status !== 'fulfilled') continue
+    if (result.status === 'rejected') {
+      if (isHyperliquidRateLimit(result.reason)) throw result.reason
+      continue
+    }
 
     const { dex, dexOffset, meta } = result.value
     const baseAssetId = 110000 + dexOffset * 10000
@@ -187,10 +190,17 @@ async function listPerpDexQueries<T>(
   const dexs = await listPerpDexs(info)
   const dexNames = [undefined, ...dexs.map((dex) => dex.name)]
   const results = await Promise.allSettled(dexNames.map((dex) => query(dex)))
+  const rows: DexQueryResult<T>[] = []
 
-  return results.flatMap((result, index) =>
-    result.status === 'fulfilled' ? [{ dex: dexNames[index], data: result.value }] : [],
-  )
+  for (const [index, result] of results.entries()) {
+    if (result.status === 'rejected') {
+      if (isHyperliquidRateLimit(result.reason)) throw result.reason
+      continue
+    }
+    rows.push({ dex: dexNames[index], data: result.value })
+  }
+
+  return rows
 }
 
 async function listUserPerpRawPositions(info: InfoClient, address: string): Promise<RawPosition[]> {
@@ -314,7 +324,8 @@ async function fetchOrdersForDex(info: InfoClient, address: string, dex?: string
     return dex
       ? await info.frontendOpenOrders({ user: address, dex })
       : await info.frontendOpenOrders({ user: address })
-  } catch {
+  } catch (err) {
+    if (isHyperliquidRateLimit(err)) throw err
     return dex
       ? await info.openOrders({ user: address, dex })
       : await info.openOrders({ user: address })

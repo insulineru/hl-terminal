@@ -126,4 +126,13 @@ cli.command('candles', candles)
 cli.command(order)
 cli.command(position)
 
-cli.serve(normalizeBooleanFlagValues(process.argv.slice(2)))
+let argv: string[]
+try {
+  argv = normalizeBooleanFlagValues(process.argv.slice(2))
+} catch (err) {
+  const message = err instanceof Error ? err.message : String(err)
+  process.stderr.write(`${message}\n`)
+  process.exit(1)
+}
+
+cli.serve(argv)

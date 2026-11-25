@@ -8,7 +8,7 @@
     "gen": "incur gen --output src/incur.generated.ts",
     "dev": "zile dev",
     "knip": "knip",
-    "release": "zile publish:prepare && npm pkg fix && changeset publish && zile publish:post",
+    "release": "./scripts/release.sh",
     "start": "bun run src/index.ts",
     "test": "bun test"
   },

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { Parser, z } from 'incur'
+import { Cli, Parser, z } from 'incur'
 import { booleanPriceError, isBooleanWord, normalizeBooleanFlagValues } from './argv.js'
 
 const createArgs = z.object({
@@ -65,14 +65,36 @@ describe('normalizeBooleanFlagValues', () => {
     expect(parsed.args.price).toBeUndefined()
   })
 
-  test('equals form is left for incur, and -r false turns the flag off', () => {
-    const equals = parseCreate(['BTC', 'buy', '0.001', '--reduce-only=false', '--dry-run=true'])
-    expect(equals.options.reduceOnly).toBe(false)
-    expect(equals.options.dryRun).toBe(true)
+  test('equals form accepts true/false/1/0/yes/no in any case', () => {
+    expect(parseCreate(['BTC', 'buy', '0.001', '--reduce-only=TRUE']).options.reduceOnly).toBe(true)
+    expect(parseCreate(['BTC', 'buy', '0.001', '--reduce-only=FALSE']).options.reduceOnly).toBe(
+      false,
+    )
+    expect(parseCreate(['BTC', 'buy', '0.001', '--reduce-only=yes']).options.reduceOnly).toBe(true)
+    expect(parseCreate(['BTC', 'buy', '0.001', '--reduce-only=No']).options.reduceOnly).toBe(false)
+    expect(parseCreate(['BTC', 'buy', '0.001', '--reduce-only=1']).options.reduceOnly).toBe(true)
+    expect(parseCreate(['BTC', 'buy', '0.001', '--dry-run=0']).options.dryRun).toBe(false)
 
-    const short = parseCreate(['BTC', 'buy', '0.001', '-r', 'false'])
+    const normalized = normalizeBooleanFlagValues([
+      'order',
+      'create',
+      'BTC',
+      'buy',
+      '0.001',
+      '-r',
+      'false',
+    ])
+    expect(normalized).toContain('--no-reduce-only')
+    const short = Parser.parse(
+      normalized.filter((token) => token !== 'order' && token !== 'create'),
+      { args: createArgs, options: createOptions, alias },
+    )
     expect(short.options.reduceOnly).toBe(false)
     expect(short.args.price).toBeUndefined()
+  })
+
+  test('rejects an unknown boolean word after =', () => {
+    expect(() => normalizeBooleanFlagValues(['--reduce-only=maybe'])).toThrow(/Invalid boolean/)
   })
 
   test('--no-reduce-only false means reduce-only', () => {
@@ -90,5 +112,71 @@ describe('normalizeBooleanFlagValues', () => {
   test('does not steal the value of a non-boolean flag', () => {
     const argv = normalizeBooleanFlagValues(['--slippage', '10', '--trigger', '56666'])
     expect(argv).toEqual(['--slippage', '10', '--trigger', '56666'])
+  })
+
+  test('fills -d false stays --days, not --no-dry-run', () => {
+    const argv = normalizeBooleanFlagValues(['fills', 'BTC', '-d', 'false'])
+    expect(argv).toEqual(['fills', 'BTC', '-d', 'false'])
+    expect(argv.join(' ')).not.toContain('--no-dry-run')
+
+    let thrown: unknown
+    try {
+      Parser.parse(['BTC', '-d', 'false'], {
+        args: z.object({ coin: z.string().optional() }),
+        options: z.object({
+          limit: z.number().optional(),
+          days: z.number().optional(),
+        }),
+        alias: { limit: 'l', days: 'd' },
+      })
+    } catch (err) {
+      thrown = err
+    }
+    expect(String(thrown)).not.toContain('--no-dry-run')
+    expect(thrown).toBeDefined()
+  })
+
+  test('presence-only false is dropped so incur does not see --no-*', async () => {
+    const argv = normalizeBooleanFlagValues([
+      'price',
+      'BTC',
+      '--testnet',
+      'false',
+      '-t',
+      'FALSE',
+      '--verbose',
+      'false',
+      '--json',
+      'no',
+      '--verbose=TRUE',
+    ])
+    expect(argv).toEqual(['price', 'BTC', '--verbose'])
+    expect(argv.join(' ')).not.toContain('--no-')
+
+    const lines: string[] = []
+    let code = 0
+    const cli = Cli.create('demo', {
+      options: z.object({ testnet: z.boolean().optional() }),
+      alias: { testnet: 't' },
+    })
+    cli.command('price', {
+      args: z.object({ coin: z.string() }),
+      output: z.object({ coin: z.string() }),
+      run(c) {
+        return c.ok({ coin: c.args.coin })
+      },
+    })
+    await cli.serve(argv, {
+      exit(status) {
+        code = status
+      },
+      stdout(chunk) {
+        lines.push(chunk)
+      },
+    })
+    const text = lines.join('')
+    expect(text).not.toContain('Unknown flag')
+    expect(code).toBe(0)
+    expect(text).toContain('BTC')
   })
 })
