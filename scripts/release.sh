@@ -49,6 +49,9 @@ trap 'mv package.json.bak package.json 2>/dev/null || true' EXIT
 echo "→ Building package..."
 bun run build
 
+echo "→ Normalizing published package.json (bin paths)..."
+npm pkg fix
+
 VERSION=$(node -p "require('./package.json').version")
 echo "✔ Built hl-terminal@$VERSION"
 

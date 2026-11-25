@@ -1,8 +1,8 @@
 import { Cli, z } from 'incur'
+import { commandError } from '../lib/errors.js'
 import {
   resolveAsset,
   formatPrice,
-  errorMessage,
   parseOrderStatus,
   requireExchange,
   normalizePerpCoin,
@@ -58,7 +58,7 @@ position.command('leverage', {
       const resolved = await resolveAsset(c.var.info, coin)
       assetId = resolved.assetId
     } catch (err) {
-      return c.error({ code: 'UNKNOWN_COIN', message: errorMessage(err) })
+      return c.error(commandError(err, 'UNKNOWN_COIN'))
     }
 
     const isCross = !c.options.isolated
@@ -85,7 +85,7 @@ position.command('leverage', {
         },
       )
     } catch (err) {
-      return c.error({ code: 'LEVERAGE_FAILED', message: errorMessage(err) })
+      return c.error(commandError(err, 'LEVERAGE_FAILED'))
     }
   },
 })
@@ -219,7 +219,7 @@ async function placeTriggerOrder(
       { cta: { commands: [{ command: 'orders', description: 'View trigger orders' }] } },
     )
   } catch (err) {
-    return c.error({ code: tpsl === 'tp' ? 'TP_FAILED' : 'SL_FAILED', message: errorMessage(err) })
+    return c.error(commandError(err, tpsl === 'tp' ? 'TP_FAILED' : 'SL_FAILED'))
   }
 }
 
@@ -262,7 +262,7 @@ position.command('tp', {
         c.options.dryRun,
       )
     } catch (err) {
-      return c.error({ code: 'TP_FAILED', message: errorMessage(err) })
+      return c.error(commandError(err, 'TP_FAILED'))
     }
   },
 })
@@ -293,7 +293,7 @@ position.command('sl', {
         c.options.dryRun,
       )
     } catch (err) {
-      return c.error({ code: 'SL_FAILED', message: errorMessage(err) })
+      return c.error(commandError(err, 'SL_FAILED'))
     }
   },
 })

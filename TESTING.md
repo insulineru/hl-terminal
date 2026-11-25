@@ -137,6 +137,8 @@ hl-terminal funding
 
 > **Warning**: These execute real trades on mainnet. Use `--dry-run` for safety.
 
+The CLI flag is `--dry-run`. Command output uses the field `dryRun`. `--dry-run true` and `--dry-run false` both work. Do not write the flag as `--dryRun`.
+
 ### order
 
 ```bash
@@ -159,9 +161,18 @@ hl-terminal order trigger BTC sell 0.5 --trigger 56666 --slippage 10 --dry-run
 hl-terminal order trigger BTC buy 0.1 --trigger 100000 --limit 100500 --dry-run
 # Expected: type: stop-limit, isMarket: false, triggerPx: "100000", limitPx: "100500"
 
-# `--reduce-only false` with a space parses as true. Turn reduce-only off with either form:
-hl-terminal order trigger BTC sell 0.5 --trigger 56666 --no-reduce-only --dry-run
+# Take-profit style. type follows --tpsl, not a stop-* name.
+hl-terminal order trigger BTC sell 0.5 --trigger 100000 --tpsl tp --dry-run
+# Expected: dryRun: true, type: take-profit-market, tpsl: tp
+
+# Boolean flags accept true/false after a space. true/false is never a price.
+hl-terminal order create BTC buy 0.001 --reduce-only true --dry-run
+# Expected: dryRun: true, reduceOnly: true, type: market (price is not "true")
+
+hl-terminal order trigger BTC sell 0.5 --trigger 56666 --reduce-only false --dry-run
+# Expected: dryRun: true, reduceOnly: false
 hl-terminal order trigger BTC sell 0.5 --trigger 56666 --reduce-only=false --dry-run
+hl-terminal order trigger BTC sell 0.5 --trigger 56666 --no-reduce-only --dry-run
 
 # Cancel all (dry)
 hl-terminal order cancel-all --dry-run

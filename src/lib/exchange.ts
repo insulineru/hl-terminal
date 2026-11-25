@@ -40,12 +40,7 @@ export async function buildAssetMap(info: InfoClient): Promise<Map<string, numbe
 
 export { normalizePerpCoin }
 
-/**
- * Extract a message string from an unknown error.
- */
-export function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err)
-}
+export { errorMessage } from './errors.js'
 
 /**
  * Decode Hyperliquid wire-format side code to human-readable string.

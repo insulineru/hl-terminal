@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: bun install --frozen-lockfile
+      - run: bunx oxlint --ignore-pattern package.json
+      - run: bunx oxfmt --check src/
+      - run: bun run check:types
+      - run: bun run knip
+      - run: bun test
+        env:
+          # Config tests use os.homedir(). Keep them off the runner's real home.
+          HOME: /tmp/hl-terminal-test-home
+      - name: Clean-install smoke
+        run: bash scripts/smoke-install.sh

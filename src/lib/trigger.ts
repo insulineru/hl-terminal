@@ -1,11 +1,12 @@
+import { booleanPriceError, isBooleanWord } from './argv.js'
 import {
-  errorMessage,
   formatPrice,
   formatSize,
   normalizePerpCoin,
   parseOrderStatus,
   resolveAsset,
 } from './exchange.js'
+import { commandError, errorMessage } from './errors.js'
 import { getPerpMarkPrice } from './perps.js'
 
 /** Default trigger style: a buy fires when price rises, a sell when price falls. */
@@ -20,6 +21,17 @@ export const CROSSED_TRIGGER_WARNING =
 
 export type TriggerSide = 'buy' | 'sell'
 export type TriggerTpsl = 'sl' | 'tp'
+export type TriggerOrderKind =
+  | 'stop-market'
+  | 'stop-limit'
+  | 'take-profit-market'
+  | 'take-profit-limit'
+
+/** Output `type`. `--tpsl tp` is a take-profit, not a stop. */
+export function triggerOrderKind(isMarket: boolean, tpsl: TriggerTpsl): TriggerOrderKind {
+  if (tpsl === 'tp') return isMarket ? 'take-profit-market' : 'take-profit-limit'
+  return isMarket ? 'stop-market' : 'stop-limit'
+}
 
 export type TriggerWireOrder = {
   a: number
@@ -37,7 +49,7 @@ export type TriggerWireOrder = {
 }
 
 export type TriggerOrderPreview = {
-  type: 'stop-market' | 'stop-limit'
+  type: TriggerOrderKind
   side: TriggerSide
   size: string
   triggerPx: string
@@ -52,7 +64,12 @@ export type TriggerOrderPreview = {
   grouping: 'na'
 }
 
-export type TriggerOrderFailure = { ok: false; code: string; message: string }
+export type TriggerOrderFailure = {
+  ok: false
+  code: string
+  message: string
+  retryable?: boolean
+}
 
 export type BuildTriggerOrderInput = {
   assetId: number
@@ -71,8 +88,13 @@ export type BuildTriggerOrderInput = {
   tpsl?: TriggerTpsl
 }
 
-function failure(code: string, message: string): TriggerOrderFailure {
-  return { ok: false, code, message }
+function failure(code: string, message: string, retryable?: boolean): TriggerOrderFailure {
+  return retryable ? { ok: false, code, message, retryable } : { ok: false, code, message }
+}
+
+function failureFrom(err: unknown, code: string): TriggerOrderFailure {
+  const mapped = commandError(err, code)
+  return failure(mapped.code, mapped.message, mapped.retryable)
 }
 
 function isPositive(value: number): boolean {
@@ -150,6 +172,10 @@ export function buildTriggerOrder(
     return failure('INVALID_SIZE', `Size must be greater than 0 (got ${size}).`)
   }
 
+  if (isBooleanWord(input.triggerPx)) {
+    return failure('INVALID_PRICE', booleanPriceError(input.triggerPx))
+  }
+
   if (Number.isFinite(Number(input.triggerPx)) && !(Number(input.triggerPx) > 0)) {
     return failure(
       'INVALID_PRICE',
@@ -204,6 +230,9 @@ export function buildTriggerOrder(
       )
     }
   } else {
+    if (isBooleanWord(requestedLimit)) {
+      return failure('INVALID_PRICE', booleanPriceError(requestedLimit))
+    }
     if (Number.isFinite(Number(requestedLimit)) && !(Number(requestedLimit) > 0)) {
       return failure('INVALID_PRICE', `Limit price must be greater than 0 (got ${requestedLimit}).`)
     }
@@ -232,7 +261,7 @@ export function buildTriggerOrder(
   return {
     ok: true,
     preview: {
-      type: isMarket ? 'stop-market' : 'stop-limit',
+      type: triggerOrderKind(isMarket, tpsl),
       side: input.side,
       size,
       triggerPx,
@@ -268,7 +297,7 @@ export type TriggerOrderOptions = {
 
 export type TriggerOrderSuccess = {
   dryRun: boolean
-  type: 'stop-market' | 'stop-limit'
+  type: TriggerOrderKind
   coin: string
   side: TriggerSide
   size: string
@@ -310,14 +339,16 @@ export async function executeTriggerOrder(
     assetId = resolved.assetId
     szDecimals = resolved.szDecimals
   } catch (err) {
-    return failure('ASSET_NOT_FOUND', errorMessage(err))
+    return failureFrom(err, 'ASSET_NOT_FOUND')
   }
 
   let markRaw: string | undefined
   try {
     markRaw = await getPerpMarkPrice(deps.info, coin)
   } catch (err) {
-    return failure('PRICE_FETCH_FAILED', `Failed to fetch mark price: ${errorMessage(err)}`)
+    const mapped = commandError(err, 'PRICE_FETCH_FAILED')
+    if (mapped.code === 'RATE_LIMITED') return failure(mapped.code, mapped.message, true)
+    return failure('PRICE_FETCH_FAILED', `Failed to fetch mark price: ${mapped.message}`)
   }
   if (!markRaw) {
     return failure('PRICE_NOT_FOUND', `No mark price found for ${coin}`)
@@ -396,6 +427,24 @@ export async function executeTriggerOrder(
       },
     }
   } catch (err) {
-    return failure('ORDER_FAILED', errorMessage(err))
+    return failureFrom(err, 'ORDER_FAILED')
   }
+}
+
+/** Next commands after a live trigger. A fill is a position, so do not offer cancel. */
+export function triggerSuccessCommands(data: {
+  status: string
+  oid: number | null
+}): { command: string; description: string }[] {
+  if (data.status === 'filled') {
+    return [{ command: 'positions', description: 'View positions' }]
+  }
+  const commands = [{ command: 'orders', description: 'View open orders' }]
+  if (data.oid != null) {
+    commands.unshift({
+      command: `order cancel ${data.oid}`,
+      description: 'Cancel this trigger order',
+    })
+  }
+  return commands
 }

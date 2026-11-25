@@ -1,4 +1,5 @@
 import type { InfoClient } from '@nktkas/hyperliquid'
+import { isHyperliquidRateLimit } from './errors.js'
 
 export type PerpMarket = {
   name: string
@@ -80,7 +81,8 @@ async function listPerpDexs(info: InfoClient): Promise<DexMeta[]> {
   try {
     const dexs = await info.perpDexs()
     return (dexs ?? []).flatMap((dex) => (dex?.name ? [{ name: dex.name }] : []))
-  } catch {
+  } catch (err) {
+    if (isHyperliquidRateLimit(err)) throw err
     return []
   }
 }

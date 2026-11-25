@@ -1,11 +1,12 @@
 {
   "lockfileVersion": 1,
+  "configVersion": 0,
   "workspaces": {
     "": {
       "name": "hyperliquid-cli",
       "dependencies": {
         "@nktkas/hyperliquid": "^0.32.1",
-        "incur": "^0.3.13",
+        "incur": "0.3.13",
         "viem": "^2.46.3",
       },
       "devDependencies": {

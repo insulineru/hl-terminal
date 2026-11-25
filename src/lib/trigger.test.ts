@@ -3,6 +3,8 @@ import {
   buildTriggerOrder,
   CROSSED_TRIGGER_WARNING,
   executeTriggerOrder,
+  triggerOrderKind,
+  triggerSuccessCommands,
   type TriggerWireOrder,
 } from './trigger.js'
 
@@ -583,6 +585,83 @@ describe('buildTriggerOrder validation', () => {
         expect(built.preview.order.t.trigger.tpsl).toBe(entry.tpsl)
       }
     }
+  })
+})
+
+describe('trigger order kind and follow-up', () => {
+  test('names a take-profit from --tpsl tp instead of a stop', () => {
+    expect(triggerOrderKind(true, 'sl')).toBe('stop-market')
+    expect(triggerOrderKind(false, 'sl')).toBe('stop-limit')
+    expect(triggerOrderKind(true, 'tp')).toBe('take-profit-market')
+    expect(triggerOrderKind(false, 'tp')).toBe('take-profit-limit')
+
+    const market = buildTriggerOrder(baseInput({ side: 'sell', tpsl: 'tp', triggerPx: '100000' }))
+    expect(market.ok).toBe(true)
+    if (!market.ok) return
+    expect(market.preview.type).toBe('take-profit-market')
+
+    const limit = buildTriggerOrder(
+      baseInput({ side: 'sell', tpsl: 'tp', triggerPx: '100000', limitPx: '100500' }),
+    )
+    expect(limit.ok).toBe(true)
+    if (!limit.ok) return
+    expect(limit.preview.type).toBe('take-profit-limit')
+  })
+
+  test('rejects true/false as a trigger or limit price', () => {
+    for (const triggerPx of ['true', 'false', 'TRUE']) {
+      const built = buildTriggerOrder(baseInput({ triggerPx }))
+      expect(built.ok).toBe(false)
+      if (built.ok) return
+      expect(built.code).toBe('INVALID_PRICE')
+      expect(built.message).toContain('never a price')
+    }
+
+    const limit = buildTriggerOrder(
+      baseInput({ side: 'buy', triggerPx: '100000', limitPx: 'false' }),
+    )
+    expect(limit.ok).toBe(false)
+    if (limit.ok) return
+    expect(limit.code).toBe('INVALID_PRICE')
+  })
+
+  test('a filled trigger points at positions and does not offer cancel', () => {
+    expect(triggerSuccessCommands({ status: 'filled', oid: 8 })).toEqual([
+      { command: 'positions', description: 'View positions' },
+    ])
+    expect(triggerSuccessCommands({ status: 'resting', oid: 4242 })).toEqual([
+      { command: 'order cancel 4242', description: 'Cancel this trigger order' },
+      { command: 'orders', description: 'View open orders' },
+    ])
+    expect(triggerSuccessCommands({ status: 'waitingForTrigger', oid: null })).toEqual([
+      { command: 'orders', description: 'View open orders' },
+    ])
+  })
+
+  test('maps HTTP 429 from market lookup to RATE_LIMITED', async () => {
+    const result = await executeTriggerOrder(
+      {
+        info: {
+          async meta() {
+            throw Object.assign(new Error('429 Too Many Requests - null'), {
+              response: { status: 429, headers: { get: () => null } },
+            })
+          },
+          async perpDexs() {
+            return []
+          },
+        },
+      },
+      { coin: 'BTC', side: 'sell', size: '0.5' },
+      { trigger: '56666', reduceOnly: false, slippage: 3, dryRun: true, force: false },
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      code: 'RATE_LIMITED',
+      message: 'Hyperliquid rate limited this request (HTTP 429). Retry after a short wait.',
+      retryable: true,
+    })
   })
 })
 
