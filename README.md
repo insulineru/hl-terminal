@@ -88,7 +88,7 @@ hl-terminal position leverage BTC 10
 | Command | Description |
 | --- | --- |
 | `hl-terminal order create <coin> <side> <size> [price]` | Place limit (with price) or market (without) order |
-| `hl-terminal order trigger <coin> <buy\|sell> <size> --trigger <px>` | Stop-market entry. Add `--limit <px>` for a stop-limit. Size is absolute. `--reduce-only` defaults to false |
+| `hl-terminal order trigger <coin> <buy\|sell> <size> --trigger <px>` | Stop-market entry (`--tpsl sl` by default). Add `--limit <px>` for a stop-limit. Size is absolute. `--reduce-only` defaults to false |
 | `hl-terminal order cancel <oid>` | Cancel an order by ID, including trigger orders |
 | `hl-terminal order cancel-all` | Cancel all open orders (optional `--coin` filter) |
 
@@ -136,22 +136,26 @@ All commands are exposed as tools that AI agents can call programmatically, incl
 `hl-terminal --llms` prints the command manifest (name, arguments, and description) for every command. `hl-terminal skills add` syncs the same command reference to agent skill files. Trigger entries are documented there as `order trigger`:
 
 ```bash
-# Stop-market: sell 0.5 BTC if mark falls to 56666. Limit is trigger minus slippage (default 3%).
-hl-terminal order trigger BTC sell 0.5 --trigger 56666
+# Stop-market: sell 0.5 BTC if mark falls to 56666.
+# --slippage 10 matches the Hyperliquid UI (trigger × 0.9). The default is 3, same as market orders.
+hl-terminal order trigger BTC sell 0.5 --trigger 56666 --slippage 10
 
 # Stop-limit: buy 0.1 BTC if mark rises to 100000, then rest a limit at 100500.
 hl-terminal order trigger BTC buy 0.1 --trigger 100000 --limit 100500
 
-# Preview only. A buy stop must be above the mark and a sell stop below it.
+# Take-profit style trigger (buy when price falls). Default --tpsl is sl.
+hl-terminal order trigger BTC buy 0.1 --trigger 80000 --tpsl tp --dry-run
+
+# Preview only.
 hl-terminal order trigger BTC sell 0.5 --trigger 56666 --dry-run
 
-# Cancel the returned oid.
+# Cancel the returned oid. The cancel result includes triggerPx.
 hl-terminal order cancel 4242
 ```
 
-Stop entries use Hyperliquid trigger semantics `tpsl: sl` (a sell fires when price falls to the trigger, a buy when price rises). Pass `--force` to place a trigger on the wrong side of the mark. `--reduce-only` defaults to false, so the order can open or flip a position. Position take-profit and stop-loss stay on `position tp` / `position sl`.
+`--tpsl sl` (the default) buys when price rises to the trigger and sells when price falls. `--tpsl tp` is the opposite: a buy must be below the mark and a sell above it. Pass `--force` to place a trigger that is already across the mark. An already-crossed trigger may execute immediately at market or be rejected by Hyperliquid. `--reduce-only` defaults to false, so the order can open or flip a position. A space-separated `--reduce-only false` is parsed as true; use `--no-reduce-only` or `--reduce-only=false`. Position take-profit and stop-loss stay on `position tp` / `position sl`.
 
-`orders` prints `triggerPx` separately from the limit price (a stop-market's limit is the slippage bound, often trigger × 1.1 or × 0.9), plus `isMarket`, `reduceOnly`, and `tpsl`. Position-wide TP/SL sizes are shown as `full position`.
+`orders` prints `triggerPx` and `triggerCondition` separately from the limit price (a stop-market's limit is the slippage bound), plus `isMarket`, `reduceOnly`, and `tpsl`. A trigger whose exchange size is 0 is shown as `full position`. A partial TP/SL keeps its size.
 
 ## Security
 

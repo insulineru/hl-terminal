@@ -33,9 +33,11 @@ export type PerpOpenOrder = {
   reduceOnly: boolean
   /** `sl` for stops, `tp` for take-profits, null otherwise. */
   tpsl: 'tp' | 'sl' | null
+  /** Hyperliquid trigger condition text. Null when the order is not a trigger. */
+  triggerCondition: string | null
 }
 
-/** Shown instead of "0" / "0.0" for position-wide TP/SL, which scale with the position. */
+/** Shown for a trigger order whose exchange size is 0 (it covers the whole position). */
 export const FULL_POSITION_SIZE = 'full position'
 
 export function normalizePerpCoin(coin: string): string {
@@ -265,9 +267,15 @@ function orderTpsl(orderType: string): 'tp' | 'sl' | null {
 
 function displayOrderSize(order: any, isTrigger: boolean): string {
   const raw = String(order.sz ?? '0')
-  // Position TP/SL is submitted with size 0 and scales with the position.
-  if (order.isPositionTpsl === true) return FULL_POSITION_SIZE
+  // Only a zero-size trigger covers the whole position. A partial TP/SL keeps its size.
   if (isTrigger && Number.parseFloat(raw) === 0) return FULL_POSITION_SIZE
+  return raw
+}
+
+function displayTriggerCondition(order: any, isTrigger: boolean): string | null {
+  if (!isTrigger) return null
+  const raw = order.triggerCondition
+  if (typeof raw !== 'string' || raw.length === 0) return null
   return raw
 }
 
@@ -295,6 +303,7 @@ function mapOpenOrder(order: any, dex?: string): PerpOpenOrder {
     isMarket: orderIsMarket(orderType),
     reduceOnly: order.reduceOnly === true,
     tpsl: orderTpsl(orderType),
+    triggerCondition: displayTriggerCondition(order, isTrigger),
   }
 }
 

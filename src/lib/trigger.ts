@@ -8,14 +8,18 @@ import {
 } from './exchange.js'
 import { getPerpMarkPrice } from './perps.js'
 
+/** Default trigger style: a buy fires when price rises, a sell when price falls. */
+export const DEFAULT_TRIGGER_TPSL = 'sl' as const
+
 /**
- * Stop entries always use Hyperliquid `tpsl: "sl"`:
- * a buy triggers when price rises to the trigger, a sell when price falls to it.
- * `tpsl: "tp"` is the opposite and is reserved for position take-profits.
+ * Shown with --force and on a wrong-side trigger. An already-crossed trigger is
+ * live against the current mark, so Hyperliquid may fill it immediately or reject it.
  */
-export const STOP_ENTRY_TPSL = 'sl' as const
+export const CROSSED_TRIGGER_WARNING =
+  'An already-crossed trigger may execute immediately at market or be rejected by Hyperliquid.'
 
 export type TriggerSide = 'buy' | 'sell'
+export type TriggerTpsl = 'sl' | 'tp'
 
 export type TriggerWireOrder = {
   a: number
@@ -27,7 +31,7 @@ export type TriggerWireOrder = {
     trigger: {
       isMarket: boolean
       triggerPx: string
-      tpsl: typeof STOP_ENTRY_TPSL
+      tpsl: TriggerTpsl
     }
   }
 }
@@ -40,7 +44,7 @@ export type TriggerOrderPreview = {
   limitPx: string
   isMarket: boolean
   reduceOnly: boolean
-  tpsl: typeof STOP_ENTRY_TPSL
+  tpsl: TriggerTpsl
   /** Present for stop-market orders, where the limit is trigger ± slippage. */
   slippage?: number
   warning?: string
@@ -63,36 +67,55 @@ export type BuildTriggerOrderInput = {
   slippagePct: number
   markPx: number
   force: boolean
+  /** Defaults to sl. tp reverses which side of the mark is valid. */
+  tpsl?: TriggerTpsl
 }
 
 function failure(code: string, message: string): TriggerOrderFailure {
   return { ok: false, code, message }
 }
 
+function isPositive(value: number): boolean {
+  return Number.isFinite(value) && value > 0
+}
+
+/** (buy, sl) and (sell, tp) arm above the mark. (sell, sl) and (buy, tp) arm below it. */
+export function triggerWantsAboveMark(side: TriggerSide, tpsl: TriggerTpsl): boolean {
+  return (side === 'buy' && tpsl === 'sl') || (side === 'sell' && tpsl === 'tp')
+}
+
 /**
- * True when a stop entry would be on the wrong side of the mark.
- * Buy stops belong above the mark; sell stops belong below it.
+ * True when the trigger is already on the crossed side of the mark, including equality.
+ * That order can fire immediately.
  */
 export function triggerDirectionMismatch(
   side: TriggerSide,
+  tpsl: TriggerTpsl,
   triggerPx: number,
   markPx: number,
 ): boolean {
-  if (side === 'buy') return triggerPx <= markPx
+  if (triggerWantsAboveMark(side, tpsl)) return triggerPx <= markPx
   return triggerPx >= markPx
 }
 
 function directionMessage(
   side: TriggerSide,
+  tpsl: TriggerTpsl,
   triggerPx: string,
   markPx: number,
   force: boolean,
 ): string {
-  const relation = side === 'buy' ? 'above' : 'below'
-  const movement = side === 'buy' ? 'rises' : 'falls'
-  const base = `${side === 'buy' ? 'Buy' : 'Sell'} stop trigger ${triggerPx} must be ${relation} mark ${markPx}. Stop entries use tpsl "sl" and trigger when price ${movement}.`
+  const above = triggerWantsAboveMark(side, tpsl)
+  const relation = above ? 'above' : 'below'
+  const movement = above ? 'rises' : 'falls'
+  const label = side === 'buy' ? 'Buy' : 'Sell'
+  const base = `${label} ${tpsl} trigger ${triggerPx} must be ${relation} mark ${markPx} (${tpsl} ${side} triggers when price ${movement}). ${CROSSED_TRIGGER_WARNING}`
   if (force) return `${base} Placing anyway because --force was set.`
   return `${base} Pass --force to place it anyway.`
+}
+
+function formattedPositive(raw: string, formatted: string): boolean {
+  return isPositive(Number(raw)) && isPositive(Number(formatted))
 }
 
 /**
@@ -104,12 +127,34 @@ export function buildTriggerOrder(
   input: BuildTriggerOrderInput,
 ): { ok: true; preview: TriggerOrderPreview } | TriggerOrderFailure {
   const isBuy = input.side === 'buy'
+  const tpsl = input.tpsl ?? DEFAULT_TRIGGER_TPSL
+
+  if (!Number.isFinite(input.slippagePct) || input.slippagePct < 0 || input.slippagePct >= 100) {
+    return failure(
+      'INVALID_SLIPPAGE',
+      `Slippage must be >= 0 and < 100 (got ${input.slippagePct}).`,
+    )
+  }
+
+  if (Number.isFinite(Number(input.size)) && !(Number(input.size) > 0)) {
+    return failure('INVALID_SIZE', `Size must be greater than 0 (got ${input.size}).`)
+  }
 
   let size: string
   try {
     size = formatSize(input.size, input.szDecimals)
   } catch (err) {
     return failure('INVALID_SIZE', `Invalid size "${input.size}": ${errorMessage(err)}`)
+  }
+  if (!formattedPositive(input.size, size)) {
+    return failure('INVALID_SIZE', `Size must be greater than 0 (got ${size}).`)
+  }
+
+  if (Number.isFinite(Number(input.triggerPx)) && !(Number(input.triggerPx) > 0)) {
+    return failure(
+      'INVALID_PRICE',
+      `Trigger price must be greater than 0 (got ${input.triggerPx}).`,
+    )
   }
 
   let triggerPx: string
@@ -121,13 +166,20 @@ export function buildTriggerOrder(
       `Invalid trigger price "${input.triggerPx}": ${errorMessage(err)}`,
     )
   }
+  if (!formattedPositive(input.triggerPx, triggerPx)) {
+    return failure('INVALID_PRICE', `Trigger price must be greater than 0 (got ${triggerPx}).`)
+  }
 
-  const triggerNum = Number.parseFloat(triggerPx)
-  const mismatched = triggerDirectionMismatch(input.side, triggerNum, input.markPx)
+  if (!isPositive(input.markPx)) {
+    return failure('PRICE_NOT_FOUND', `No mark price found (got ${input.markPx}).`)
+  }
+
+  const triggerNum = Number(triggerPx)
+  const mismatched = triggerDirectionMismatch(input.side, tpsl, triggerNum, input.markPx)
   if (mismatched && !input.force) {
     return failure(
       'TRIGGER_DIRECTION',
-      directionMessage(input.side, triggerPx, input.markPx, false),
+      directionMessage(input.side, tpsl, triggerPx, input.markPx, false),
     )
   }
 
@@ -141,11 +193,20 @@ export function buildTriggerOrder(
       limitPx = formatPrice(slipped, input.szDecimals, 'perp')
     } catch (err) {
       return failure(
-        'INVALID_PRICE',
-        `Invalid stop-market limit from trigger "${triggerPx}" and slippage ${input.slippagePct}%: ${errorMessage(err)}`,
+        'INVALID_SLIPPAGE',
+        `Stop-market limit from trigger ${triggerPx} at ${input.slippagePct}% slippage is not a positive price: ${errorMessage(err)}`,
+      )
+    }
+    if (!isPositive(Number(limitPx))) {
+      return failure(
+        'INVALID_SLIPPAGE',
+        `Stop-market limit price ${limitPx} must be greater than 0. Lower --slippage or raise the trigger.`,
       )
     }
   } else {
+    if (Number.isFinite(Number(requestedLimit)) && !(Number(requestedLimit) > 0)) {
+      return failure('INVALID_PRICE', `Limit price must be greater than 0 (got ${requestedLimit}).`)
+    }
     try {
       limitPx = formatPrice(requestedLimit, input.szDecimals, 'perp')
     } catch (err) {
@@ -153,6 +214,9 @@ export function buildTriggerOrder(
         'INVALID_PRICE',
         `Invalid limit price "${requestedLimit}": ${errorMessage(err)}`,
       )
+    }
+    if (!formattedPositive(requestedLimit, limitPx)) {
+      return failure('INVALID_PRICE', `Limit price must be greater than 0 (got ${limitPx}).`)
     }
   }
 
@@ -162,7 +226,7 @@ export function buildTriggerOrder(
     p: limitPx,
     s: size,
     r: input.reduceOnly,
-    t: { trigger: { isMarket, triggerPx, tpsl: STOP_ENTRY_TPSL } },
+    t: { trigger: { isMarket, triggerPx, tpsl } },
   }
 
   return {
@@ -175,10 +239,10 @@ export function buildTriggerOrder(
       limitPx,
       isMarket,
       reduceOnly: input.reduceOnly,
-      tpsl: STOP_ENTRY_TPSL,
+      tpsl,
       ...(isMarket ? { slippage: input.slippagePct } : {}),
       ...(mismatched
-        ? { warning: directionMessage(input.side, triggerPx, input.markPx, true) }
+        ? { warning: directionMessage(input.side, tpsl, triggerPx, input.markPx, true) }
         : {}),
       order,
       grouping: 'na',
@@ -199,6 +263,7 @@ export type TriggerOrderOptions = {
   slippage: number
   dryRun: boolean
   force: boolean
+  tpsl?: TriggerTpsl
 }
 
 export type TriggerOrderSuccess = {
@@ -211,12 +276,15 @@ export type TriggerOrderSuccess = {
   limitPx: string
   isMarket: boolean
   reduceOnly: boolean
-  tpsl: typeof STOP_ENTRY_TPSL
+  tpsl: TriggerTpsl
   slippage?: number
   markPx: string
   warning?: string
   status: string
   oid: number | null
+  /** Set when the trigger filled immediately. */
+  avgPx?: string
+  totalSz?: string
 }
 
 type TriggerExchange = {
@@ -255,6 +323,11 @@ export async function executeTriggerOrder(
     return failure('PRICE_NOT_FOUND', `No mark price found for ${coin}`)
   }
 
+  const markPx = Number(markRaw)
+  if (!isPositive(markPx)) {
+    return failure('PRICE_NOT_FOUND', `No mark price found for ${coin}`)
+  }
+
   const built = buildTriggerOrder({
     assetId,
     szDecimals,
@@ -264,8 +337,9 @@ export async function executeTriggerOrder(
     limitPx: options.limit,
     reduceOnly: options.reduceOnly,
     slippagePct: options.slippage,
-    markPx: Number.parseFloat(markRaw),
+    markPx,
     force: options.force,
+    tpsl: options.tpsl,
   })
   if (!built.ok) return built
 
@@ -279,7 +353,7 @@ export async function executeTriggerOrder(
     limitPx: built.preview.limitPx,
     isMarket: built.preview.isMarket,
     reduceOnly: built.preview.reduceOnly,
-    tpsl: STOP_ENTRY_TPSL,
+    tpsl: built.preview.tpsl,
     ...(built.preview.slippage !== undefined ? { slippage: built.preview.slippage } : {}),
     markPx: markRaw,
     ...(built.preview.warning ? { warning: built.preview.warning } : {}),
@@ -298,14 +372,29 @@ export async function executeTriggerOrder(
       orders: [built.preview.order],
       grouping: built.preview.grouping,
     })
-    const parsed = parseOrderStatus(response?.response?.data?.statuses?.[0])
+    const statuses = response?.response?.data?.statuses
+    const rawStatus = Array.isArray(statuses) ? statuses[0] : undefined
+    if (rawStatus === undefined) {
+      return failure('ORDER_FAILED', 'Exchange returned no order status')
+    }
+
+    const parsed = parseOrderStatus(rawStatus)
     if (parsed.kind === 'error') {
       return failure('ORDER_REJECTED', parsed.message)
     }
 
     const status = parsed.kind === 'string' ? parsed.value : parsed.kind
     const oid = parsed.kind === 'resting' || parsed.kind === 'filled' ? parsed.oid : null
-    return { ok: true, data: { ...data, dryRun: false, status, oid } }
+    return {
+      ok: true,
+      data: {
+        ...data,
+        dryRun: false,
+        status,
+        oid,
+        ...(parsed.kind === 'filled' ? { avgPx: parsed.avgPx, totalSz: parsed.totalSz } : {}),
+      },
+    }
   } catch (err) {
     return failure('ORDER_FAILED', errorMessage(err))
   }

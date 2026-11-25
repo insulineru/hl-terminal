@@ -49,6 +49,7 @@ declare module 'incur' {
         options: {
           trigger: string
           limit?: string
+          tpsl: 'sl' | 'tp'
           reduceOnly: boolean
           slippage: number
           force: boolean

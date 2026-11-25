@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'bun:test'
-import { buildTriggerOrder, executeTriggerOrder, type TriggerWireOrder } from './trigger.js'
+import {
+  buildTriggerOrder,
+  CROSSED_TRIGGER_WARNING,
+  executeTriggerOrder,
+  type TriggerWireOrder,
+} from './trigger.js'
 
 const MARK = 90_000
 
@@ -114,6 +119,7 @@ describe('buildTriggerOrder', () => {
     if (refused.ok) return
     expect(refused.code).toBe('TRIGGER_DIRECTION')
     expect(refused.message).toContain('--force')
+    expect(refused.message).toContain(CROSSED_TRIGGER_WARNING)
 
     const atMark = buildTriggerOrder(baseInput({ triggerPx: '90000' }))
     expect(atMark.ok).toBe(false)
@@ -122,6 +128,7 @@ describe('buildTriggerOrder', () => {
     expect(forced.ok).toBe(true)
     if (!forced.ok) return
     expect(forced.preview.warning).toContain('--force')
+    expect(forced.preview.warning).toContain(CROSSED_TRIGGER_WARNING)
     expect(forced.preview.order.t.trigger.triggerPx).toBe('95000')
     expect(forced.preview.order.t.trigger.tpsl).toBe('sl')
   })
@@ -231,6 +238,7 @@ describe('executeTriggerOrder dry-run', () => {
     expect(result.data.triggerPx).toBe('80000')
     expect(result.data.tpsl).toBe('sl')
     expect(result.data.warning).toContain('--force')
+    expect(result.data.warning).toContain(CROSSED_TRIGGER_WARNING)
     expect(result.data.limitPx).toBe('82400')
   })
 
@@ -329,5 +337,266 @@ describe('executeTriggerOrder request submission', () => {
     if (!result.ok) return
     expect(result.data.size).toBe('0.5')
     expect('clearinghouseState' in info).toBe(false)
+  })
+
+  test('returns the fill price and size when the trigger fills immediately', async () => {
+    const result = await executeTriggerOrder(
+      {
+        info: infoMock('95000'),
+        exchange: {
+          async order() {
+            return {
+              response: {
+                data: { statuses: [{ filled: { oid: 8, avgPx: '56600', totalSz: '0.5' } }] },
+              },
+            }
+          },
+        },
+      },
+      { coin: 'BTC', side: 'sell', size: '0.5' },
+      { trigger: '56666', reduceOnly: false, slippage: 3, dryRun: false, force: false },
+    )
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.data.status).toBe('filled')
+    expect(result.data.oid).toBe(8)
+    expect(result.data.avgPx).toBe('56600')
+    expect(result.data.totalSz).toBe('0.5')
+  })
+
+  test('reports waitingForTrigger without an oid', async () => {
+    const result = await executeTriggerOrder(
+      {
+        info: infoMock('95000'),
+        exchange: {
+          async order() {
+            return { response: { data: { statuses: ['waitingForTrigger'] } } }
+          },
+        },
+      },
+      { coin: 'BTC', side: 'sell', size: '0.5' },
+      { trigger: '56666', reduceOnly: false, slippage: 3, dryRun: false, force: false },
+    )
+
+    expect(result).toMatchObject({
+      ok: true,
+      data: { status: 'waitingForTrigger', oid: null, dryRun: false },
+    })
+  })
+
+  test('returns ORDER_REJECTED when the exchange rejects the trigger', async () => {
+    const result = await executeTriggerOrder(
+      {
+        info: infoMock('95000'),
+        exchange: {
+          async order() {
+            return { response: { data: { statuses: [{ error: 'Insufficient margin' }] } } }
+          },
+        },
+      },
+      { coin: 'BTC', side: 'sell', size: '0.5' },
+      { trigger: '56666', reduceOnly: false, slippage: 3, dryRun: false, force: false },
+    )
+
+    expect(result).toEqual({ ok: false, code: 'ORDER_REJECTED', message: 'Insufficient margin' })
+  })
+
+  test('returns ORDER_FAILED when the status list is empty or the request throws', async () => {
+    const empty = await executeTriggerOrder(
+      {
+        info: infoMock('95000'),
+        exchange: {
+          async order() {
+            return { response: { data: { statuses: [] } } }
+          },
+        },
+      },
+      { coin: 'BTC', side: 'sell', size: '0.5' },
+      { trigger: '56666', reduceOnly: false, slippage: 3, dryRun: false, force: false },
+    )
+    expect(empty).toEqual({
+      ok: false,
+      code: 'ORDER_FAILED',
+      message: 'Exchange returned no order status',
+    })
+
+    const thrown = await executeTriggerOrder(
+      {
+        info: infoMock('95000'),
+        exchange: {
+          async order() {
+            throw new Error('network down')
+          },
+        },
+      },
+      { coin: 'BTC', side: 'sell', size: '0.5' },
+      { trigger: '56666', reduceOnly: false, slippage: 3, dryRun: false, force: false },
+    )
+    expect(thrown).toEqual({ ok: false, code: 'ORDER_FAILED', message: 'network down' })
+  })
+
+  test('resolves a builder-dex market and rounds the trigger to the tick', async () => {
+    const requests: unknown[] = []
+    const info = {
+      async meta(params?: { dex?: string }) {
+        if (params?.dex === 'xyz') {
+          return { universe: [{ name: 'xyz:BRENTOIL', szDecimals: 2, maxLeverage: 5 }] }
+        }
+        return { universe: [{ name: 'BTC', szDecimals: 5, maxLeverage: 50 }] }
+      },
+      async perpDexs() {
+        return [null, { name: 'xyz' }]
+      },
+      async metaAndAssetCtxs(params?: { dex?: string }) {
+        if (params?.dex === 'xyz') {
+          return [
+            { universe: [{ name: 'xyz:BRENTOIL', szDecimals: 2, maxLeverage: 5 }] },
+            [{ markPx: '70.5' }],
+          ]
+        }
+        return [{ universe: [{ name: 'BTC' }] }, [{ markPx: '90000' }]]
+      },
+    }
+
+    const result = await executeTriggerOrder(
+      {
+        info,
+        exchange: {
+          async order(req) {
+            requests.push(req)
+            return { response: { data: { statuses: [{ resting: { oid: 15 } }] } } }
+          },
+        },
+      },
+      { coin: 'xyz:brentoil', side: 'sell', size: '1.239' },
+      {
+        trigger: '60.5559',
+        reduceOnly: false,
+        slippage: 10,
+        dryRun: false,
+        force: false,
+        tpsl: 'sl',
+      },
+    )
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.data.coin).toBe('xyz:BRENTOIL')
+    expect(result.data.size).toBe('1.23')
+    expect(result.data.triggerPx).toBe('60.555')
+    expect(requests).toEqual([
+      {
+        grouping: 'na',
+        orders: [
+          {
+            a: 110000,
+            b: false,
+            p: '54.499',
+            s: '1.23',
+            r: false,
+            t: { trigger: { isMarket: true, triggerPx: '60.555', tpsl: 'sl' } },
+          },
+        ],
+      },
+    ])
+  })
+})
+
+describe('buildTriggerOrder validation', () => {
+  test('rejects non-positive size, trigger, and limit, including values the formatter keeps', () => {
+    for (const size of ['0', '-1', '-0.5']) {
+      const built = buildTriggerOrder(baseInput({ size }))
+      expect(built.ok).toBe(false)
+      if (built.ok) return
+      expect(built.code).toBe('INVALID_SIZE')
+    }
+
+    for (const triggerPx of ['0', '-1']) {
+      const built = buildTriggerOrder(baseInput({ triggerPx }))
+      expect(built.ok).toBe(false)
+      if (built.ok) return
+      expect(built.code).toBe('INVALID_PRICE')
+    }
+
+    for (const limitPx of ['0', '-5']) {
+      const built = buildTriggerOrder(baseInput({ side: 'buy', triggerPx: '100000', limitPx }))
+      expect(built.ok).toBe(false)
+      if (built.ok) return
+      expect(built.code).toBe('INVALID_PRICE')
+    }
+  })
+
+  test('rejects a missing, zero, or NaN mark', () => {
+    for (const markPx of [Number.NaN, 0, -1]) {
+      const built = buildTriggerOrder(baseInput({ markPx }))
+      expect(built.ok).toBe(false)
+      if (built.ok) return
+      expect(built.code).toBe('PRICE_NOT_FOUND')
+    }
+  })
+
+  test('rejects slippage outside [0, 100) and a stop-market limit that is not positive', () => {
+    for (const slippagePct of [-1, 100, 150, Number.NaN]) {
+      const built = buildTriggerOrder(baseInput({ slippagePct }))
+      expect(built.ok).toBe(false)
+      if (built.ok) return
+      expect(built.code).toBe('INVALID_SLIPPAGE')
+    }
+
+    const collapsed = buildTriggerOrder(
+      baseInput({ side: 'sell', triggerPx: '1', slippagePct: 99.9, szDecimals: 5 }),
+    )
+    expect(collapsed.ok).toBe(false)
+    if (collapsed.ok) return
+    expect(collapsed.code).toBe('INVALID_SLIPPAGE')
+  })
+
+  test('rounds the trigger and size to the market increment', () => {
+    const built = buildTriggerOrder(baseInput({ triggerPx: '56666.129', size: '1.23456789' }))
+    expect(built.ok).toBe(true)
+    if (!built.ok) return
+    expect(built.preview.triggerPx).toBe('56666')
+    expect(built.preview.size).toBe('1.23456')
+    expect(built.preview.order.t.trigger.triggerPx).toBe('56666')
+  })
+
+  test('validates direction for each side and tpsl pair', () => {
+    const cases = [
+      { side: 'buy' as const, tpsl: 'sl' as const, triggerPx: '100000', ok: true },
+      { side: 'buy' as const, tpsl: 'sl' as const, triggerPx: '80000', ok: false },
+      { side: 'sell' as const, tpsl: 'sl' as const, triggerPx: '80000', ok: true },
+      { side: 'sell' as const, tpsl: 'sl' as const, triggerPx: '100000', ok: false },
+      { side: 'buy' as const, tpsl: 'tp' as const, triggerPx: '80000', ok: true },
+      { side: 'buy' as const, tpsl: 'tp' as const, triggerPx: '100000', ok: false },
+      { side: 'sell' as const, tpsl: 'tp' as const, triggerPx: '100000', ok: true },
+      { side: 'sell' as const, tpsl: 'tp' as const, triggerPx: '80000', ok: false },
+    ]
+
+    for (const entry of cases) {
+      const built = buildTriggerOrder(baseInput(entry))
+      expect(built.ok).toBe(entry.ok)
+      if (!built.ok) {
+        expect(built.code).toBe('TRIGGER_DIRECTION')
+        expect(built.message).toContain(CROSSED_TRIGGER_WARNING)
+      } else {
+        expect(built.preview.order.t.trigger.tpsl).toBe(entry.tpsl)
+      }
+    }
+  })
+})
+
+describe('executeTriggerOrder mark price', () => {
+  test('returns PRICE_NOT_FOUND when the mark is missing or not positive', async () => {
+    for (const mark of ['0', '-5', 'NaN']) {
+      const result = await executeTriggerOrder(
+        { info: infoMock(mark) },
+        { coin: 'BTC', side: 'sell', size: '0.5' },
+        { trigger: '56666', reduceOnly: false, slippage: 3, dryRun: true, force: false },
+      )
+      expect(result.ok).toBe(false)
+      if (result.ok) return
+      expect(result.code).toBe('PRICE_NOT_FOUND')
+    }
   })
 })

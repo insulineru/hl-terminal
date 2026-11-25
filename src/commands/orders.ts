@@ -13,7 +13,9 @@ export const orders = {
         side: z.string(),
         size: z
           .string()
-          .describe('Base size, or "full position" for a position-wide TP/SL (exchange size 0)'),
+          .describe(
+            'Base size. A trigger with exchange size 0 shows "full position"; partial TP/SL sizes are kept',
+          ),
         price: z
           .string()
           .describe(
@@ -32,6 +34,12 @@ export const orders = {
           .enum(['tp', 'sl'])
           .nullable()
           .describe('tp for take-profit, sl for stop, null for plain limit/market orders'),
+        triggerCondition: z
+          .string()
+          .nullable()
+          .describe(
+            'Trigger condition text from the exchange. Null when the order is not a trigger',
+          ),
       }),
     ),
   }),
