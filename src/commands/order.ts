@@ -1,16 +1,21 @@
 import { Cli, z } from 'incur'
+import { booleanPriceError, isBooleanWord } from '../lib/argv.js'
+import { commandError, errorMessage } from '../lib/errors.js'
 import {
   resolveAsset,
   buildAssetMap,
   formatPrice,
   formatSize,
-  errorMessage,
   parseOrderStatus,
   requireExchange,
   normalizePerpCoin,
 } from '../lib/exchange.js'
 import { getPerpMidPrice, listUserPerpOpenOrders } from '../lib/perps.js'
-import { CROSSED_TRIGGER_WARNING, executeTriggerOrder } from '../lib/trigger.js'
+import {
+  CROSSED_TRIGGER_WARNING,
+  executeTriggerOrder,
+  triggerSuccessCommands,
+} from '../lib/trigger.js'
 
 const TIF_MAP: Record<string, 'Gtc' | 'Ioc' | 'Alo'> = {
   GTC: 'Gtc',
@@ -81,7 +86,7 @@ order.command('create', {
       assetId = resolved.assetId
       szDecimals = resolved.szDecimals
     } catch (err) {
-      return c.error({ code: 'ASSET_NOT_FOUND', message: errorMessage(err) })
+      return c.error(commandError(err, 'ASSET_NOT_FOUND'))
     }
 
     let formattedSize: string
@@ -104,6 +109,9 @@ order.command('create', {
     if (c.args.price !== undefined) {
       // Limit order
       orderType = 'limit'
+      if (isBooleanWord(c.args.price)) {
+        return c.error({ code: 'INVALID_PRICE', message: booleanPriceError(c.args.price) })
+      }
       try {
         formattedPrice = formatPrice(c.args.price!, szDecimals, 'perp')
       } catch (err) {
@@ -122,9 +130,11 @@ order.command('create', {
       try {
         mid = await getPerpMidPrice(c.var.info, coin)
       } catch (err) {
+        const mapped = commandError(err, 'PRICE_FETCH_FAILED')
+        if (mapped.code === 'RATE_LIMITED') return c.error(mapped)
         return c.error({
           code: 'PRICE_FETCH_FAILED',
-          message: `Failed to fetch mid prices: ${errorMessage(err)}`,
+          message: `Failed to fetch mid prices: ${mapped.message}`,
         })
       }
 
@@ -271,7 +281,7 @@ order.command('create', {
         },
       )
     } catch (err) {
-      return c.error({ code: 'ORDER_FAILED', message: errorMessage(err) })
+      return c.error(commandError(err, 'ORDER_FAILED'))
     }
   },
 })
@@ -300,7 +310,7 @@ order.command('trigger', {
       .boolean()
       .default(false)
       .describe(
-        'Reduce-only. Default false so the order can open or flip a position. `--reduce-only false` (space) parses as true; use --no-reduce-only or --reduce-only=false',
+        'Reduce-only. Default false so the order can open or flip a position. `--reduce-only true` and `--reduce-only false` both work',
       ),
     slippage: z
       .number()
@@ -335,11 +345,15 @@ order.command('trigger', {
       description: 'Preview a sell stop-market with the 10% bound the Hyperliquid UI uses',
     },
   ],
-  hint: 'Omit --limit for a stop-market. Default slippage is 3% (same as market orders); pass --slippage 10 so a stop-market is more likely to fill, matching the Hyperliquid UI. --tpsl sl (default) buys above the mark and sells below it; --tpsl tp is the opposite. --force places an already-crossed trigger, which may fill immediately or be rejected. Cancel with: order cancel <oid>.',
+  hint: 'Omit --limit for a stop-market. Default slippage is 3% (same as market orders); pass --slippage 10 so a stop-market is more likely to fill, matching the Hyperliquid UI. --tpsl sl (default) buys above the mark and sells below it; --tpsl tp is the opposite. --force places an already-crossed trigger, which may fill immediately or be rejected. Cancel a resting order with: order cancel <oid>. If it fills immediately, check positions.',
   alias: { reduceOnly: 'r', dryRun: 'd' },
   output: z.object({
     dryRun: z.boolean().describe('True when the order was not sent'),
-    type: z.enum(['stop-market', 'stop-limit']).describe('stop-market when --limit is omitted'),
+    type: z
+      .enum(['stop-market', 'stop-limit', 'take-profit-market', 'take-profit-limit'])
+      .describe(
+        'stop-market or take-profit-market when --limit is omitted. --tpsl tp uses the take-profit names',
+      ),
     coin: z.string(),
     side: z.string(),
     size: z.string().describe('Absolute size sent to the exchange'),
@@ -379,19 +393,17 @@ order.command('trigger', {
       },
     )
 
-    if (!result.ok) return c.error({ code: result.code, message: result.message })
-
-    if (result.data.dryRun) return c.ok(result.data)
-
-    const commands = [{ command: 'orders', description: 'View open orders' }]
-    if (result.data.oid != null) {
-      commands.unshift({
-        command: `order cancel ${result.data.oid}`,
-        description: 'Cancel this trigger order',
+    if (!result.ok) {
+      return c.error({
+        code: result.code,
+        message: result.message,
+        ...(result.retryable ? { retryable: true } : {}),
       })
     }
 
-    return c.ok(result.data, { cta: { commands } })
+    if (result.data.dryRun) return c.ok(result.data)
+
+    return c.ok(result.data, { cta: { commands: triggerSuccessCommands(result.data) } })
   },
 })
 
@@ -433,7 +445,7 @@ order.command('cancel', {
         buildAssetMap(c.var.info),
       ])
     } catch (err) {
-      return c.error({ code: 'FETCH_ORDERS_FAILED', message: errorMessage(err) })
+      return c.error(commandError(err, 'FETCH_ORDERS_FAILED'))
     }
 
     // Find the target order
@@ -476,7 +488,7 @@ order.command('cancel', {
         { cta: { commands: [{ command: 'orders', description: 'View remaining orders' }] } },
       )
     } catch (err) {
-      return c.error({ code: 'CANCEL_FAILED', message: errorMessage(err) })
+      return c.error(commandError(err, 'CANCEL_FAILED'))
     }
   },
 })
@@ -519,7 +531,7 @@ order.command('cancel-all', {
         buildAssetMap(c.var.info),
       ])
     } catch (err) {
-      return c.error({ code: 'FETCH_ORDERS_FAILED', message: errorMessage(err) })
+      return c.error(commandError(err, 'FETCH_ORDERS_FAILED'))
     }
 
     // Filter by coin if provided
@@ -592,7 +604,7 @@ order.command('cancel-all', {
         { cta: { commands: [{ command: 'orders', description: 'Confirm no remaining orders' }] } },
       )
     } catch (err) {
-      return c.error({ code: 'CANCEL_ALL_FAILED', message: errorMessage(err) })
+      return c.error(commandError(err, 'CANCEL_ALL_FAILED'))
     }
   },
 })

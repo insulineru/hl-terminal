@@ -1,8 +1,10 @@
 #!/usr/bin/env bun
 import { createRequire } from 'node:module'
 import { Cli, z, middleware } from 'incur'
+import { normalizeBooleanFlagValues } from './lib/argv.js'
 import { loadActiveAccount } from './lib/config.js'
 import { createInfoClient, createExchangeClient } from './lib/client.js'
+import { commandError } from './lib/errors.js'
 import { account } from './commands/account.js'
 import { price } from './commands/price.js'
 import { balance } from './commands/balance.js'
@@ -53,7 +55,7 @@ cli.use(
   middleware<typeof vars>(async (c, next) => {
     // Skip middleware for account management commands
     if (c.command.startsWith('account')) {
-      await next()
+      await runCommand(c, next)
       return
     }
 
@@ -94,9 +96,22 @@ cli.use(
       c.set('exchange', exchangeProxy)
     }
 
-    await next()
+    await runCommand(c, next)
   }),
 )
+
+async function runCommand(
+  c: { error: (options: { code: string; message: string; retryable?: boolean }) => never },
+  next: () => Promise<void>,
+) {
+  try {
+    await next()
+  } catch (err) {
+    const mapped = commandError(err, 'UNKNOWN')
+    if (mapped.code === 'RATE_LIMITED') return c.error(mapped)
+    throw err
+  }
+}
 
 // Register commands
 cli.command(account)
@@ -111,4 +126,13 @@ cli.command('candles', candles)
 cli.command(order)
 cli.command(position)
 
-cli.serve()
+let argv: string[]
+try {
+  argv = normalizeBooleanFlagValues(process.argv.slice(2))
+} catch (err) {
+  const message = err instanceof Error ? err.message : String(err)
+  process.stderr.write(`${message}\n`)
+  process.exit(1)
+}
+
+cli.serve(argv)

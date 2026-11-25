@@ -1,4 +1,5 @@
 import { z } from 'incur'
+import { commandError } from '../lib/errors.js'
 import { normalizePerpCoin } from '../lib/perps.js'
 
 const CANDLE_INTERVALS = [
@@ -91,7 +92,9 @@ export const candles = {
         startTime,
         endTime: now,
       })
-    } catch {
+    } catch (err) {
+      const mapped = commandError(err, 'CANDLES_UNAVAILABLE')
+      if (mapped.code === 'RATE_LIMITED') return c.error(mapped)
       return c.error({
         code: 'CANDLES_UNAVAILABLE',
         message: `Candle data not available for ${coin}`,

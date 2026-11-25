@@ -153,7 +153,7 @@ hl-terminal order trigger BTC sell 0.5 --trigger 56666 --dry-run
 hl-terminal order cancel 4242
 ```
 
-`--tpsl sl` (the default) buys when price rises to the trigger and sells when price falls. `--tpsl tp` is the opposite: a buy must be below the mark and a sell above it. Pass `--force` to place a trigger that is already across the mark. An already-crossed trigger may execute immediately at market or be rejected by Hyperliquid. `--reduce-only` defaults to false, so the order can open or flip a position. A space-separated `--reduce-only false` is parsed as true; use `--no-reduce-only` or `--reduce-only=false`. Position take-profit and stop-loss stay on `position tp` / `position sl`.
+`--tpsl sl` (the default) buys when price rises to the trigger and sells when price falls. `--tpsl tp` is the opposite: a buy must be below the mark and a sell above it. Pass `--force` to place a trigger that is already across the mark. An already-crossed trigger may execute immediately at market or be rejected by Hyperliquid. `--reduce-only` defaults to false, so the order can open or flip a position. `--reduce-only true` and `--reduce-only false` (with a space or `=`) both work, as do `--dry-run true` and `--dry-run false`. `true` and `false` are never read as a price. Position take-profit and stop-loss stay on `position tp` / `position sl`. A `--tpsl tp` trigger is reported as `take-profit-market` or `take-profit-limit`.
 
 `orders` prints `triggerPx` and `triggerCondition` separately from the limit price (a stop-market's limit is the slippage bound), plus `isMarket`, `reduceOnly`, and `tpsl`. A trigger whose exchange size is 0 is shown as `full position`. A partial TP/SL keeps its size.
 

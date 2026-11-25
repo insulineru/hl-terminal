@@ -1,4 +1,5 @@
 import { z } from 'incur'
+import { isHyperliquidRateLimit } from '../lib/errors.js'
 import { listPerpMarkets, normalizePerpCoin } from '../lib/perps.js'
 
 export const funding = {
@@ -68,7 +69,8 @@ export const funding = {
             }
           }
           return null
-        } catch {
+        } catch (err) {
+          if (isHyperliquidRateLimit(err)) throw err
           return null
         }
       }),
