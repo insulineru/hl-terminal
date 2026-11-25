@@ -41,6 +41,7 @@ const cli = Cli.create('hl-terminal', {
       'Check BTC price: hl price BTC',
       'View account balance: hl balance',
       'Place a market buy: hl order create BTC buy 0.001',
+      'Preview a sell stop: hl order trigger BTC sell 0.5 --trigger 56666 --dry-run',
     ],
     depth: 1,
   },

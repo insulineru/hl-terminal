@@ -10,6 +10,7 @@ import {
   normalizePerpCoin,
 } from '../lib/exchange.js'
 import { getPerpMidPrice, listUserPerpOpenOrders } from '../lib/perps.js'
+import { CROSSED_TRIGGER_WARNING, executeTriggerOrder } from '../lib/trigger.js'
 
 const TIF_MAP: Record<string, 'Gtc' | 'Ioc' | 'Alo'> = {
   GTC: 'Gtc',
@@ -18,7 +19,7 @@ const TIF_MAP: Record<string, 'Gtc' | 'Ioc' | 'Alo'> = {
 }
 
 export const order = Cli.create('order', {
-  description: 'Place and manage orders',
+  description: 'Place and manage orders, including stop-market and stop-limit entries',
 })
 
 order.command('create', {
@@ -275,6 +276,125 @@ order.command('create', {
   },
 })
 
+order.command('trigger', {
+  description:
+    'Place a stop entry (stop-market or stop-limit). Size is absolute and does not scale with a position. Reduce-only defaults to false, so the order can open or flip a position.',
+  args: z.object({
+    coin: z.string().describe('Coin symbol (BTC, ETH)'),
+    side: z.enum(['buy', 'sell']).describe('Order side'),
+    size: z.string().describe('Absolute order size in base units. Does not scale with position'),
+  }),
+  options: z.object({
+    trigger: z.string().describe('Trigger price. Direction versus the mark depends on --tpsl'),
+    limit: z
+      .string()
+      .optional()
+      .describe('Limit price. Omit for a stop-market; set for a stop-limit'),
+    tpsl: z
+      .enum(['sl', 'tp'])
+      .default('sl')
+      .describe(
+        'Trigger style. sl (default): buy fires when price rises, sell when it falls. tp is the opposite',
+      ),
+    reduceOnly: z
+      .boolean()
+      .default(false)
+      .describe(
+        'Reduce-only. Default false so the order can open or flip a position. `--reduce-only false` (space) parses as true; use --no-reduce-only or --reduce-only=false',
+      ),
+    slippage: z
+      .number()
+      .min(0)
+      .lt(100)
+      .default(3)
+      .describe(
+        'Slippage % for the stop-market limit. Default 3 matches market orders. Pass 10 to match the Hyperliquid UI',
+      ),
+    force: z
+      .boolean()
+      .default(false)
+      .describe(
+        `Place even if the trigger is on the wrong side of the mark. ${CROSSED_TRIGGER_WARNING}`,
+      ),
+    dryRun: z.boolean().default(false).describe('Preview without executing'),
+  }),
+  examples: [
+    {
+      args: { coin: 'BTC', side: 'sell', size: '0.5' },
+      options: { trigger: '56666' },
+      description: 'Sell stop-market 0.5 BTC if price falls to 56666',
+    },
+    {
+      args: { coin: 'BTC', side: 'buy', size: '0.1' },
+      options: { trigger: '100000', limit: '100500' },
+      description: 'Buy stop-limit 0.1 BTC, trigger 100000, limit 100500',
+    },
+    {
+      args: { coin: 'BTC', side: 'sell', size: '0.5' },
+      options: { trigger: '56666', slippage: 10, dryRun: true },
+      description: 'Preview a sell stop-market with the 10% bound the Hyperliquid UI uses',
+    },
+  ],
+  hint: 'Omit --limit for a stop-market. Default slippage is 3% (same as market orders); pass --slippage 10 so a stop-market is more likely to fill, matching the Hyperliquid UI. --tpsl sl (default) buys above the mark and sells below it; --tpsl tp is the opposite. --force places an already-crossed trigger, which may fill immediately or be rejected. Cancel with: order cancel <oid>.',
+  alias: { reduceOnly: 'r', dryRun: 'd' },
+  output: z.object({
+    dryRun: z.boolean().describe('True when the order was not sent'),
+    type: z.enum(['stop-market', 'stop-limit']).describe('stop-market when --limit is omitted'),
+    coin: z.string(),
+    side: z.string(),
+    size: z.string().describe('Absolute size sent to the exchange'),
+    triggerPx: z.string().describe('Price that activates the order'),
+    limitPx: z
+      .string()
+      .describe('Limit price. For a stop-market this is the slippage bound, not the trigger'),
+    isMarket: z.boolean().describe('True for stop-market (Hyperliquid trigger isMarket)'),
+    reduceOnly: z.boolean(),
+    tpsl: z.enum(['sl', 'tp']).describe('Trigger style sent to Hyperliquid'),
+    slippage: z.number().optional().describe('Slippage % used for a stop-market limit'),
+    avgPx: z.string().optional().describe('Average fill price when the order fills immediately'),
+    totalSz: z.string().optional().describe('Filled size when the order fills immediately'),
+    markPx: z.string().describe('Mark price used for the direction check'),
+    warning: z.string().optional().describe('Set when --force overrides a wrong-side trigger'),
+    status: z.string(),
+    oid: z.number().nullable().describe('Exchange order id, or null for a dry run'),
+  }),
+  async run(c: any) {
+    // Watch-only accounts can preview. A live order still needs a private key.
+    if (!c.options.dryRun) {
+      const guard = requireExchange(c, 'place orders')
+      if (guard) return guard
+    }
+
+    const result = await executeTriggerOrder(
+      { info: c.var.info, exchange: c.var.exchange },
+      { coin: c.args.coin, side: c.args.side, size: c.args.size },
+      {
+        trigger: c.options.trigger,
+        limit: c.options.limit,
+        reduceOnly: c.options.reduceOnly,
+        slippage: c.options.slippage,
+        dryRun: c.options.dryRun,
+        force: c.options.force,
+        tpsl: c.options.tpsl,
+      },
+    )
+
+    if (!result.ok) return c.error({ code: result.code, message: result.message })
+
+    if (result.data.dryRun) return c.ok(result.data)
+
+    const commands = [{ command: 'orders', description: 'View open orders' }]
+    if (result.data.oid != null) {
+      commands.unshift({
+        command: `order cancel ${result.data.oid}`,
+        description: 'Cancel this trigger order',
+      })
+    }
+
+    return c.ok(result.data, { cta: { commands } })
+  },
+})
+
 order.command('cancel', {
   description: 'Cancel an order by ID',
   args: z.object({
@@ -294,6 +414,10 @@ order.command('cancel', {
       side: z.string(),
       size: z.string(),
       price: z.string(),
+      triggerPx: z
+        .string()
+        .nullable()
+        .describe('Trigger price for a trigger order, otherwise null'),
     }),
   }),
   async run(c: any) {
@@ -327,6 +451,7 @@ order.command('cancel', {
       side: target.side,
       size: target.size ?? '0',
       price: target.price ?? '0',
+      triggerPx: target.triggerPx ?? null,
     }
 
     if (c.options.dryRun) {

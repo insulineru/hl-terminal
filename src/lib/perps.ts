@@ -19,14 +19,26 @@ type RawPosition = {
   liquidationPx: string
 }
 
-type RawOrder = {
+export type PerpOpenOrder = {
   oid: number
   coin: string
   side: string
   size: string
   price: string
   orderType: string
+  /** Trigger price for stop/TP orders. Null for plain limit orders. */
+  triggerPx: string | null
+  /** True when the order becomes a market order after it triggers. */
+  isMarket: boolean
+  reduceOnly: boolean
+  /** `sl` for stops, `tp` for take-profits, null otherwise. */
+  tpsl: 'tp' | 'sl' | null
+  /** Hyperliquid trigger condition text. Null when the order is not a trigger. */
+  triggerCondition: string | null
 }
+
+/** Shown for a trigger order whose exchange size is 0 (it covers the whole position). */
+export const FULL_POSITION_SIZE = 'full position'
 
 export function normalizePerpCoin(coin: string): string {
   const trimmed = coin.trim()
@@ -139,6 +151,28 @@ export async function getPerpMidPrice(info: InfoClient, coin: string): Promise<s
   return mids[rawCoinName] ?? mids[normalizedCoin]
 }
 
+/**
+ * Mark price for a perp. Trigger direction is checked against mark, not mid:
+ * a buy stop must sit above it and a sell stop below it.
+ */
+export async function getPerpMarkPrice(
+  info: InfoClient,
+  coin: string,
+): Promise<string | undefined> {
+  const normalizedCoin = normalizePerpCoin(coin)
+  const dex = getCoinDex(normalizedCoin)
+  const [meta, ctxs] = dex ? await info.metaAndAssetCtxs({ dex }) : await info.metaAndAssetCtxs()
+
+  const index = (meta.universe ?? []).findIndex(
+    (asset) => qualifyPerpCoin(dex, asset.name) === normalizedCoin,
+  )
+  if (index < 0) return undefined
+
+  const mark = ctxs[index]?.markPx
+  if (!mark || !(Number.parseFloat(mark) > 0)) return undefined
+  return mark
+}
+
 type DexQueryResult<T> = {
   dex: string | undefined
   data: T
@@ -210,6 +244,69 @@ function formatSide(code: string): string {
   return code
 }
 
+function displayOrderType(order: any): string {
+  if (typeof order.orderType === 'string' && order.orderType.length > 0) return order.orderType
+  if (order.isTrigger === true || order.isPositionTpsl === true) return 'Trigger'
+  return 'Limit'
+}
+
+function isTriggerOrder(order: any, orderType: string): boolean {
+  if (order.isTrigger === true || order.isPositionTpsl === true) return true
+  return /stop|take profit/i.test(orderType)
+}
+
+function orderIsMarket(orderType: string): boolean {
+  return /market/i.test(orderType)
+}
+
+function orderTpsl(orderType: string): 'tp' | 'sl' | null {
+  if (/take profit/i.test(orderType)) return 'tp'
+  if (/stop/i.test(orderType)) return 'sl'
+  return null
+}
+
+function displayOrderSize(order: any, isTrigger: boolean): string {
+  const raw = String(order.sz ?? '0')
+  // Only a zero-size trigger covers the whole position. A partial TP/SL keeps its size.
+  if (isTrigger && Number.parseFloat(raw) === 0) return FULL_POSITION_SIZE
+  return raw
+}
+
+function displayTriggerCondition(order: any, isTrigger: boolean): string | null {
+  if (!isTrigger) return null
+  const raw = order.triggerCondition
+  if (typeof raw !== 'string' || raw.length === 0) return null
+  return raw
+}
+
+function displayTriggerPx(order: any, isTrigger: boolean): string | null {
+  if (!isTrigger) return null
+  const raw = order.triggerPx
+  if (raw === undefined || raw === null || raw === '') return null
+  const value = Number.parseFloat(String(raw))
+  if (!Number.isFinite(value) || value <= 0) return null
+  return String(raw)
+}
+
+function mapOpenOrder(order: any, dex?: string): PerpOpenOrder {
+  const orderType = displayOrderType(order)
+  const isTrigger = isTriggerOrder(order, orderType)
+
+  return {
+    oid: order.oid ?? 0,
+    coin: qualifyPerpCoin(dex, order.coin ?? ''),
+    side: formatSide(order.side ?? ''),
+    size: displayOrderSize(order, isTrigger),
+    price: order.limitPx ?? order.px ?? '0',
+    orderType,
+    triggerPx: displayTriggerPx(order, isTrigger),
+    isMarket: orderIsMarket(orderType),
+    reduceOnly: order.reduceOnly === true,
+    tpsl: orderTpsl(orderType),
+    triggerCondition: displayTriggerCondition(order, isTrigger),
+  }
+}
+
 async function fetchOrdersForDex(info: InfoClient, address: string, dex?: string): Promise<any[]> {
   try {
     return dex
@@ -225,17 +322,10 @@ async function fetchOrdersForDex(info: InfoClient, address: string, dex?: string
 export async function listUserPerpOpenOrders(
   info: InfoClient,
   address: string,
-): Promise<RawOrder[]> {
+): Promise<PerpOpenOrder[]> {
   const orderSets = await listPerpDexQueries(info, (dex) => fetchOrdersForDex(info, address, dex))
 
   return orderSets.flatMap(({ dex, data: orders }) =>
-    (orders as any[]).map((order: any) => ({
-      oid: order.oid ?? 0,
-      coin: qualifyPerpCoin(dex, order.coin ?? ''),
-      side: formatSide(order.side ?? ''),
-      size: order.sz ?? '0',
-      price: order.limitPx ?? order.px ?? '0',
-      orderType: order.orderType ?? 'Limit',
-    })),
+    (orders as any[]).map((order: any) => mapOpenOrder(order, dex)),
   )
 }

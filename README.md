@@ -10,7 +10,7 @@
 
 - **Market data** — prices, positions, orders, balances, funding rates, fill history
 - **Account management** — add, remove, switch accounts with secure local storage
-- **Trade execution** -- limit/market orders, cancel, leverage, take-profit, stop-loss
+- **Trade execution** — limit/market orders, stop entries, cancel, leverage, take-profit, stop-loss
 - **Agent-native** — built-in MCP server mode for AI agent integration
 - **Machine-readable** — JSON output, LLM manifest, structured error codes
 - **Testnet support** — `--testnet` flag for risk-free testing
@@ -49,6 +49,9 @@ hl-terminal order create BTC buy 0.001 95000
 # Place a market sell order
 hl-terminal order create ETH sell 1.5
 
+# Preview a sell stop-market entry (not sent)
+hl-terminal order trigger BTC sell 0.5 --trigger 56666 --dry-run
+
 # Set 10x leverage on BTC
 hl-terminal position leverage BTC 10
 ```
@@ -72,7 +75,7 @@ hl-terminal position leverage BTC 10
 | `hl-terminal price <coin>` | Current mid-price for a coin |
 | `hl-terminal balance` | Perps margin + spot wallet balance |
 | `hl-terminal positions` | Open positions with PnL, leverage, liq price |
-| `hl-terminal orders` | Open orders with side, size, price, type |
+| `hl-terminal orders` | Open orders with side, size, limit price, trigger price, reduce-only, and TP/SL |
 | `hl-terminal markets` | Available markets with metadata |
 | `hl-terminal funding [coin]` | Current funding rates or history for a coin |
 | `hl-terminal fills [coin]` | Trade history with optional `--coin` filter, time range (`--days`), and pagination |
@@ -85,7 +88,8 @@ hl-terminal position leverage BTC 10
 | Command | Description |
 | --- | --- |
 | `hl-terminal order create <coin> <side> <size> [price]` | Place limit (with price) or market (without) order |
-| `hl-terminal order cancel <oid>` | Cancel an order by ID |
+| `hl-terminal order trigger <coin> <buy\|sell> <size> --trigger <px>` | Stop-market entry (`--tpsl sl` by default). Add `--limit <px>` for a stop-limit. Size is absolute. `--reduce-only` defaults to false |
+| `hl-terminal order cancel <oid>` | Cancel an order by ID, including trigger orders |
 | `hl-terminal order cancel-all` | Cancel all open orders (optional `--coin` filter) |
 
 ### Position Management
@@ -127,7 +131,31 @@ hl-terminal works as an [MCP](https://modelcontextprotocol.io) server for AI age
 hl-terminal --mcp
 ```
 
-All commands are exposed as tools that AI agents can call programmatically.
+All commands are exposed as tools that AI agents can call programmatically, including `order trigger`.
+
+`hl-terminal --llms` prints the command manifest (name, arguments, and description) for every command. `hl-terminal skills add` syncs the same command reference to agent skill files. Trigger entries are documented there as `order trigger`:
+
+```bash
+# Stop-market: sell 0.5 BTC if mark falls to 56666.
+# --slippage 10 matches the Hyperliquid UI (trigger × 0.9). The default is 3, same as market orders.
+hl-terminal order trigger BTC sell 0.5 --trigger 56666 --slippage 10
+
+# Stop-limit: buy 0.1 BTC if mark rises to 100000, then rest a limit at 100500.
+hl-terminal order trigger BTC buy 0.1 --trigger 100000 --limit 100500
+
+# Take-profit style trigger (buy when price falls). Default --tpsl is sl.
+hl-terminal order trigger BTC buy 0.1 --trigger 80000 --tpsl tp --dry-run
+
+# Preview only.
+hl-terminal order trigger BTC sell 0.5 --trigger 56666 --dry-run
+
+# Cancel the returned oid. The cancel result includes triggerPx.
+hl-terminal order cancel 4242
+```
+
+`--tpsl sl` (the default) buys when price rises to the trigger and sells when price falls. `--tpsl tp` is the opposite: a buy must be below the mark and a sell above it. Pass `--force` to place a trigger that is already across the mark. An already-crossed trigger may execute immediately at market or be rejected by Hyperliquid. `--reduce-only` defaults to false, so the order can open or flip a position. A space-separated `--reduce-only false` is parsed as true; use `--no-reduce-only` or `--reduce-only=false`. Position take-profit and stop-loss stay on `position tp` / `position sl`.
+
+`orders` prints `triggerPx` and `triggerCondition` separately from the limit price (a stop-market's limit is the slippage bound), plus `isMarket`, `reduceOnly`, and `tpsl`. A trigger whose exchange size is 0 is shown as `full position`. A partial TP/SL keeps its size.
 
 ## Security
 

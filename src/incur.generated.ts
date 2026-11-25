@@ -44,6 +44,18 @@ declare module 'incur' {
           dryRun: boolean
         }
       }
+      'order trigger': {
+        args: { coin: string; side: 'buy' | 'sell'; size: string }
+        options: {
+          trigger: string
+          limit?: string
+          tpsl: 'sl' | 'tp'
+          reduceOnly: boolean
+          slippage: number
+          force: boolean
+          dryRun: boolean
+        }
+      }
       orders: { args: {}; options: {} }
       'position leverage': {
         args: { coin: string; leverage: number }

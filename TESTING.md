@@ -60,7 +60,9 @@ hl-terminal positions
 ```bash
 # List open orders
 hl-terminal orders
-# Expected: orders array with oid, coin, side, size, price, orderType
+# Expected: orders array with oid, coin, side, size, price, orderType, triggerPx, triggerCondition, isMarket, reduceOnly, tpsl
+# Stop orders: triggerPx is the activation price (the limit in price is the slippage bound)
+# A trigger with size 0 shows "full position". A partial TP/SL keeps its size, for example "0.25"
 ```
 
 ### balance
@@ -133,30 +135,79 @@ hl-terminal funding
 
 ## Trade Commands (requires private key)
 
-> **Warning**: These execute real trades on mainnet. Use `--dryRun` for safety.
+> **Warning**: These execute real trades on mainnet. Use `--dry-run` for safety.
 
 ### order
 
 ```bash
 # Dry-run market buy
-hl-terminal order create BTC buy 0.001 --dryRun
+hl-terminal order create BTC buy 0.001 --dry-run
 # Expected: dryRun: true, preview of the order
 
 # Dry-run limit order
-hl-terminal order create ETH buy 0.01 1500 --dryRun
+hl-terminal order create ETH buy 0.01 1500 --dry-run
 # Expected: dryRun: true, limit order preview
 
+# Dry-run sell stop-market (no order is sent).
+# Default slippage is 3%. --slippage 10 matches the Hyperliquid UI bound.
+hl-terminal order trigger BTC sell 0.5 --trigger 56666 --slippage 10 --dry-run
+# Expected: dryRun: true, type: stop-market, triggerPx: "56666", isMarket: true,
+# reduceOnly: false, tpsl: sl, size: "0.5", oid: null
+# limitPx is the trigger adjusted by slippage, not the trigger itself
+
+# Dry-run buy stop-limit
+hl-terminal order trigger BTC buy 0.1 --trigger 100000 --limit 100500 --dry-run
+# Expected: type: stop-limit, isMarket: false, triggerPx: "100000", limitPx: "100500"
+
+# `--reduce-only false` with a space parses as true. Turn reduce-only off with either form:
+hl-terminal order trigger BTC sell 0.5 --trigger 56666 --no-reduce-only --dry-run
+hl-terminal order trigger BTC sell 0.5 --trigger 56666 --reduce-only=false --dry-run
+
 # Cancel all (dry)
-hl-terminal order cancel-all --dryRun
-# Expected: shows what would be cancelled
+hl-terminal order cancel-all --dry-run
+# Expected: shows what would be cancelled, including triggerPx on trigger orders
 ```
 
 ### position
 
 ```bash
 # Set leverage (dry)
-hl-terminal position leverage BTC 10 --dryRun
+hl-terminal position leverage BTC 10 --dry-run
 # Expected: dryRun: true, leverage preview
+```
+
+## Testnet: trigger that flips a position
+
+Run this only with `--testnet` and a testnet account. It places real testnet orders. Do not run it on mainnet.
+
+The sequence opens a 0.001 long, rests a 0.002 sell stop below the mark (that size closes the long and opens a 0.001 short), checks the resting order, cancels a far trigger, and leaves one stop to fire.
+
+```bash
+# Mark price, so the triggers below are actually below it
+hl-terminal price BTC --testnet
+
+# 1. Open a 0.001 long
+hl-terminal order create BTC buy 0.001 --testnet
+
+# 2. Far sell stop, used only to confirm cancel. Pick a price well below the mark.
+hl-terminal order trigger BTC sell 0.002 --trigger <far-below-mark> --slippage 10 --tpsl sl --testnet
+hl-terminal orders --testnet
+# Expected: oid, side Sell, size 0.002, triggerPx <far-below-mark>, isMarket true,
+# reduceOnly false, tpsl sl, triggerCondition set
+
+# 3. Cancel that far trigger and confirm it is gone
+hl-terminal order cancel <oid> --testnet
+# Expected: cancelled.triggerPx is the far trigger
+hl-terminal orders --testnet
+
+# 4. Sell stop below the mark, sized to flip 0.001 long into 0.001 short
+hl-terminal order trigger BTC sell 0.002 --trigger <below-mark> --slippage 10 --tpsl sl --testnet
+hl-terminal orders --testnet
+# Expected: resting oid, triggerPx <below-mark>, size 0.002, reduceOnly false
+
+# 5. After price trades through the trigger, the position should be a short of about 0.001
+hl-terminal positions --testnet
+hl-terminal fills BTC --testnet
 ```
 
 ## Network Options

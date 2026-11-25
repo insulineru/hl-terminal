@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import {
   buildPerpMarketRegistry,
+  getPerpMarkPrice,
   getPerpMidPrice,
   listUserPerpOpenOrders,
   listUserPerpPositions,
@@ -79,6 +80,19 @@ function createInfoMock(overrides: Partial<Record<string, any>> = {}) {
 
       return [{ oid: 1, coin: 'BTC', side: 'B', sz: '0.01', limitPx: '95000', orderType: 'Limit' }]
     },
+    async metaAndAssetCtxs(params?: { dex?: string }) {
+      if (params?.dex === 'xyz') {
+        return [
+          { universe: [{ name: 'xyz:BRENTOIL', szDecimals: 2, maxLeverage: 5 }] },
+          [{ markPx: '70.5' }],
+        ]
+      }
+
+      return [
+        { universe: [{ name: 'BTC', szDecimals: 5, maxLeverage: 50 }] },
+        [{ markPx: '95100' }],
+      ]
+    },
     async openOrders(params: { user: string; dex?: string }) {
       if (params.dex === 'xyz') {
         return [
@@ -156,6 +170,15 @@ describe('listUserPerpPositions', () => {
   })
 })
 
+describe('getPerpMarkPrice', () => {
+  test('reads the mark price for main and builder-dex markets', async () => {
+    const info = createInfoMock() as any
+
+    expect(await getPerpMarkPrice(info, 'btc')).toBe('95100')
+    expect(await getPerpMarkPrice(info, 'xyz:BRENTOIL')).toBe('70.5')
+  })
+})
+
 describe('listUserPerpOpenOrders', () => {
   test('aggregates orders across dexs and falls back to openOrders when frontend endpoint fails', async () => {
     const orders = await listUserPerpOpenOrders(createInfoMock() as any, '0x123')
@@ -163,19 +186,148 @@ describe('listUserPerpOpenOrders', () => {
     expect(orders).toEqual([
       {
         coin: 'BTC',
+        isMarket: false,
         oid: 1,
         orderType: 'Limit',
         price: '95000',
+        reduceOnly: false,
         side: 'Buy',
         size: '0.01',
+        tpsl: null,
+        triggerCondition: null,
+        triggerPx: null,
       },
       {
         coin: 'xyz:BRENTOIL',
+        isMarket: false,
         oid: 2,
         orderType: 'Limit',
         price: '71',
+        reduceOnly: false,
         side: 'Sell',
         size: '3',
+        tpsl: null,
+        triggerCondition: null,
+        triggerPx: null,
+      },
+    ])
+  })
+
+  test('shows triggerPx instead of treating the slippage limit as the stop, and labels position TP/SL size', async () => {
+    const info = createInfoMock({
+      async frontendOpenOrders(params: { dex?: string }) {
+        if (params.dex) return []
+        return [
+          {
+            oid: 9,
+            coin: 'BTC',
+            side: 'A',
+            sz: '0.5',
+            limitPx: '50999',
+            orderType: 'Stop Market',
+            isTrigger: true,
+            triggerPx: '56666',
+            triggerCondition: 'Price below 56666',
+            isPositionTpsl: false,
+            reduceOnly: false,
+          },
+          {
+            oid: 10,
+            coin: 'BTC',
+            side: 'A',
+            sz: '0.0',
+            limitPx: '110000',
+            orderType: 'Take Profit Market',
+            isTrigger: true,
+            triggerPx: '100000',
+            triggerCondition: 'Price above 100000',
+            isPositionTpsl: true,
+            reduceOnly: true,
+          },
+          {
+            oid: 12,
+            coin: 'BTC',
+            side: 'B',
+            sz: '0.25',
+            limitPx: '99000',
+            orderType: 'Take Profit Limit',
+            isTrigger: true,
+            triggerPx: '99500',
+            triggerCondition: 'Price below 99500',
+            isPositionTpsl: true,
+            reduceOnly: true,
+          },
+          {
+            oid: 11,
+            coin: 'ETH',
+            side: 'B',
+            sz: '1',
+            limitPx: '3100',
+            orderType: 'Stop Limit',
+            isTrigger: true,
+            triggerPx: '3000',
+            triggerCondition: 'Price above 3000',
+            isPositionTpsl: false,
+            reduceOnly: true,
+          },
+        ]
+      },
+    })
+
+    const orders = await listUserPerpOpenOrders(info as any, '0x123')
+
+    expect(orders).toEqual([
+      {
+        coin: 'BTC',
+        isMarket: true,
+        oid: 9,
+        orderType: 'Stop Market',
+        price: '50999',
+        reduceOnly: false,
+        side: 'Sell',
+        size: '0.5',
+        tpsl: 'sl',
+        triggerCondition: 'Price below 56666',
+        triggerPx: '56666',
+      },
+      {
+        coin: 'BTC',
+        isMarket: true,
+        oid: 10,
+        orderType: 'Take Profit Market',
+        price: '110000',
+        reduceOnly: true,
+        side: 'Sell',
+        size: 'full position',
+        tpsl: 'tp',
+        triggerCondition: 'Price above 100000',
+        triggerPx: '100000',
+      },
+      {
+        coin: 'BTC',
+        isMarket: false,
+        oid: 12,
+        orderType: 'Take Profit Limit',
+        price: '99000',
+        reduceOnly: true,
+        side: 'Buy',
+        size: '0.25',
+        tpsl: 'tp',
+        triggerCondition: 'Price below 99500',
+        triggerPx: '99500',
+      },
+      {
+        coin: 'ETH',
+        isMarket: false,
+        oid: 11,
+        orderType: 'Stop Limit',
+        price: '3100',
+        reduceOnly: true,
+        side: 'Buy',
+        size: '1',
+        tpsl: 'sl',
+        triggerCondition: 'Price above 3000',
+        triggerPx: '3000',
       },
     ])
   })
