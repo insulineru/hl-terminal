@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0
+
+### Minor Changes
+
+- b9d3298: Added `order trigger` for stop-market and stop-limit entries (`--tpsl sl|tp`), and showed trigger price, trigger condition, market, reduce-only, and TP/SL fields on open orders.
+
 ## 0.4.1
 
 ### Patch Changes
