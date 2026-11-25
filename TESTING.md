@@ -60,7 +60,9 @@ hl-terminal positions
 ```bash
 # List open orders
 hl-terminal orders
-# Expected: orders array with oid, coin, side, size, price, orderType
+# Expected: orders array with oid, coin, side, size, price, orderType, triggerPx, isMarket, reduceOnly, tpsl
+# Stop orders: triggerPx is the activation price (not the slippage limit in price)
+# Position-wide TP/SL: size is "full position" rather than "0.0"
 ```
 
 ### balance
@@ -145,6 +147,16 @@ hl-terminal order create BTC buy 0.001 --dryRun
 # Dry-run limit order
 hl-terminal order create ETH buy 0.01 1500 --dryRun
 # Expected: dryRun: true, limit order preview
+
+# Dry-run sell stop-market (no order is sent)
+hl-terminal order trigger BTC sell 0.5 --trigger 56666 --dry-run
+# Expected: dryRun: true, type: stop-market, triggerPx: "56666", isMarket: true,
+# reduceOnly: false, tpsl: sl, size: "0.5", oid: null
+# limitPx is the trigger adjusted by slippage (default 3%), not the trigger itself
+
+# Dry-run buy stop-limit
+hl-terminal order trigger BTC buy 0.1 --trigger 100000 --limit 100500 --dry-run
+# Expected: type: stop-limit, isMarket: false, triggerPx: "100000", limitPx: "100500"
 
 # Cancel all (dry)
 hl-terminal order cancel-all --dryRun

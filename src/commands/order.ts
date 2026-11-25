@@ -10,6 +10,7 @@ import {
   normalizePerpCoin,
 } from '../lib/exchange.js'
 import { getPerpMidPrice, listUserPerpOpenOrders } from '../lib/perps.js'
+import { executeTriggerOrder } from '../lib/trigger.js'
 
 const TIF_MAP: Record<string, 'Gtc' | 'Ioc' | 'Alo'> = {
   GTC: 'Gtc',
@@ -18,7 +19,7 @@ const TIF_MAP: Record<string, 'Gtc' | 'Ioc' | 'Alo'> = {
 }
 
 export const order = Cli.create('order', {
-  description: 'Place and manage orders',
+  description: 'Place and manage orders, including stop-market and stop-limit entries',
 })
 
 order.command('create', {
@@ -272,6 +273,109 @@ order.command('create', {
     } catch (err) {
       return c.error({ code: 'ORDER_FAILED', message: errorMessage(err) })
     }
+  },
+})
+
+order.command('trigger', {
+  description:
+    'Place a stop entry (stop-market or stop-limit). Size is absolute and does not scale with a position. Reduce-only defaults to false, so the order can open or flip a position.',
+  args: z.object({
+    coin: z.string().describe('Coin symbol (BTC, ETH)'),
+    side: z.enum(['buy', 'sell']).describe('Order side'),
+    size: z.string().describe('Absolute order size in base units. Does not scale with position'),
+  }),
+  options: z.object({
+    trigger: z
+      .string()
+      .describe(
+        'Trigger price. Buy stops fire when price rises to it; sell stops when price falls to it',
+      ),
+    limit: z
+      .string()
+      .optional()
+      .describe('Limit price. Omit for a stop-market; set for a stop-limit'),
+    reduceOnly: z
+      .boolean()
+      .default(false)
+      .describe('Reduce-only. Default false so the order can open or flip a position'),
+    slippage: z
+      .number()
+      .default(3)
+      .describe('Slippage % applied to the trigger to set the stop-market limit price'),
+    force: z
+      .boolean()
+      .default(false)
+      .describe('Place even if the trigger is on the wrong side of the mark price'),
+    dryRun: z.boolean().default(false).describe('Preview without executing'),
+  }),
+  examples: [
+    {
+      args: { coin: 'BTC', side: 'sell', size: '0.5' },
+      options: { trigger: '56666' },
+      description: 'Sell stop-market 0.5 BTC if price falls to 56666',
+    },
+    {
+      args: { coin: 'BTC', side: 'buy', size: '0.1' },
+      options: { trigger: '100000', limit: '100500' },
+      description: 'Buy stop-limit 0.1 BTC, trigger 100000, limit 100500',
+    },
+    {
+      args: { coin: 'BTC', side: 'sell', size: '0.5' },
+      options: { trigger: '56666', dryRun: true },
+      description: 'Preview a sell stop-market without placing it',
+    },
+  ],
+  hint: 'Omit --limit for a stop-market (the limit is the trigger adjusted by --slippage). A buy stop must be above the mark and a sell stop below it. Pass --force to override that check. Cancel with: order cancel <oid>.',
+  alias: { reduceOnly: 'r', dryRun: 'd' },
+  output: z.object({
+    dryRun: z.boolean().describe('True when the order was not sent'),
+    type: z.enum(['stop-market', 'stop-limit']).describe('stop-market when --limit is omitted'),
+    coin: z.string(),
+    side: z.string(),
+    size: z.string().describe('Absolute size sent to the exchange'),
+    triggerPx: z.string().describe('Price that activates the order'),
+    limitPx: z
+      .string()
+      .describe('Limit price. For a stop-market this is the slippage bound, not the trigger'),
+    isMarket: z.boolean().describe('True for stop-market (Hyperliquid trigger isMarket)'),
+    reduceOnly: z.boolean(),
+    tpsl: z.literal('sl').describe('Stop entries always use sl trigger semantics'),
+    slippage: z.number().optional().describe('Slippage % used for a stop-market limit'),
+    markPx: z.string().describe('Mark price used for the direction check'),
+    warning: z.string().optional().describe('Set when --force overrides a wrong-side trigger'),
+    status: z.string(),
+    oid: z.number().nullable().describe('Exchange order id, or null for a dry run'),
+  }),
+  async run(c: any) {
+    const guard = requireExchange(c, 'place orders')
+    if (guard) return guard
+
+    const result = await executeTriggerOrder(
+      { info: c.var.info, exchange: c.var.exchange },
+      { coin: c.args.coin, side: c.args.side, size: c.args.size },
+      {
+        trigger: c.options.trigger,
+        limit: c.options.limit,
+        reduceOnly: c.options.reduceOnly,
+        slippage: c.options.slippage,
+        dryRun: c.options.dryRun,
+        force: c.options.force,
+      },
+    )
+
+    if (!result.ok) return c.error({ code: result.code, message: result.message })
+
+    if (result.data.dryRun) return c.ok(result.data)
+
+    const commands = [{ command: 'orders', description: 'View open orders' }]
+    if (result.data.oid != null) {
+      commands.unshift({
+        command: `order cancel ${result.data.oid}`,
+        description: 'Cancel this trigger order',
+      })
+    }
+
+    return c.ok(result.data, { cta: { commands } })
   },
 })
 
