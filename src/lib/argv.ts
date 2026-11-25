@@ -74,7 +74,8 @@ const COMMAND_PREFIXES = [
   'fills',
 ]
 
-const BOOLEAN_WORDS: Record<string, boolean> = {
+/** Accepted only after `=`. Digits and yes/no are real positionals when written after a space. */
+const EQUALS_BOOLEAN_WORDS: Record<string, boolean> = {
   true: true,
   false: false,
   '1': true,
@@ -83,10 +84,24 @@ const BOOLEAN_WORDS: Record<string, boolean> = {
   no: false,
 }
 
-function booleanValue(token: string | undefined): boolean | undefined {
+/** Global options that take a value, so that value is not a command word. */
+const VALUED_GLOBAL_FLAGS = new Set(['format', 'filter-output', 'token-limit', 'token-offset'])
+
+function equalsBooleanValue(token: string | undefined): boolean | undefined {
   if (token === undefined) return undefined
   const key = token.toLowerCase()
-  if (Object.prototype.hasOwnProperty.call(BOOLEAN_WORDS, key)) return BOOLEAN_WORDS[key]
+  if (Object.prototype.hasOwnProperty.call(EQUALS_BOOLEAN_WORDS, key)) {
+    return EQUALS_BOOLEAN_WORDS[key]
+  }
+  return undefined
+}
+
+/** Space-separated flag values. Only the words true and false, never 1/0/yes/no. */
+function spacedBooleanValue(token: string | undefined): boolean | undefined {
+  if (token === undefined) return undefined
+  const key = token.toLowerCase()
+  if (key === 'true') return true
+  if (key === 'false') return false
   return undefined
 }
 
@@ -120,16 +135,56 @@ function invalidBoolean(name: string, raw: string): never {
   )
 }
 
-function flagFor(name: string, value: boolean, negatable: boolean): string | undefined {
-  if (value) return positiveFlag(name)
-  if (negatable) return negativeFlag(name)
-  return undefined
+/** A later `--testnet false` must turn off an earlier `--testnet` or `-t`. */
+function clearPresence(out: string[], name: string) {
+  const drop = new Set<string>([positiveFlag(name), `--${name}`])
+  for (const [letter, spec] of Object.entries(GLOBAL_SHORTS)) {
+    if (spec.name === name) drop.add(`-${letter}`)
+  }
+  for (let index = out.length - 1; index >= 0; index--) {
+    if (drop.has(out[index]!)) out.splice(index, 1)
+  }
+}
+
+function emitBoolean(
+  out: string[],
+  name: string,
+  enabled: boolean,
+  negatable: boolean,
+  enabledToken?: string,
+) {
+  if (enabled) {
+    out.push(enabledToken ?? positiveFlag(name))
+    return
+  }
+  if (negatable) {
+    out.push(negativeFlag(name))
+    return
+  }
+  clearPresence(out, name)
 }
 
 function detectCommand(argv: readonly string[]): string | undefined {
   const words: string[] = []
-  for (const token of argv) {
+  for (let i = 0; i < argv.length; i++) {
+    const token = argv[i]!
     if (token === '--') break
+
+    if (token.startsWith('--')) {
+      const eq = token.indexOf('=')
+      const body = eq === -1 ? token : token.slice(0, eq)
+      const name = body.startsWith('--no-') ? body.slice(5) : body.slice(2)
+      if (eq === -1 && VALUED_GLOBAL_FLAGS.has(name)) {
+        const next = argv[i + 1]
+        if (next !== undefined && !next.startsWith('-')) i++
+        continue
+      }
+      if (eq === -1 && PRESENCE_FLAGS.has(name) && spacedBooleanValue(argv[i + 1]) !== undefined) {
+        i++
+      }
+      continue
+    }
+
     if (token.startsWith('-')) continue
     words.push(token)
   }
@@ -166,16 +221,14 @@ export function normalizeBooleanFlagValues(argv: readonly string[]): string[] {
         out.push(token)
         continue
       }
-      const value = booleanValue(rawValue)
+      const value = equalsBooleanValue(rawValue)
       if (value === undefined) invalidBoolean(rawName, rawValue)
       const negatable = NEGATABLE_FLAGS.has(rawName)
-      const enabled = negated ? !value : value
-      const flag = flagFor(rawName, enabled, negatable)
-      if (flag) out.push(flag)
+      emitBoolean(out, rawName, negated ? !value : value, negatable)
       continue
     }
 
-    const value = booleanValue(argv[i + 1])
+    const value = spacedBooleanValue(argv[i + 1])
     if (value === undefined) {
       out.push(token)
       continue
@@ -184,16 +237,14 @@ export function normalizeBooleanFlagValues(argv: readonly string[]): string[] {
     if (token.startsWith('--no-') && isKnownBoolean(token.slice(5))) {
       i++
       const name = token.slice(5)
-      const flag = flagFor(name, !value, NEGATABLE_FLAGS.has(name))
-      if (flag) out.push(flag)
+      emitBoolean(out, name, !value, NEGATABLE_FLAGS.has(name))
       continue
     }
 
     if (token.startsWith('--') && isKnownBoolean(token.slice(2))) {
       i++
       const name = token.slice(2)
-      const flag = flagFor(name, value, NEGATABLE_FLAGS.has(name))
-      if (flag) out.push(flag)
+      emitBoolean(out, name, value, NEGATABLE_FLAGS.has(name))
       continue
     }
 
@@ -201,8 +252,7 @@ export function normalizeBooleanFlagValues(argv: readonly string[]): string[] {
     const short = letter ? shortFlag(command, letter) : undefined
     if (short) {
       i++
-      const flag = flagFor(short.name, value, short.negatable)
-      if (flag) out.push(value ? token : flag)
+      emitBoolean(out, short.name, value, short.negatable, value ? token : undefined)
       continue
     }
 

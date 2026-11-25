@@ -146,8 +146,7 @@ describe('normalizeBooleanFlagValues', () => {
       'FALSE',
       '--verbose',
       'false',
-      '--json',
-      'no',
+      '--json=no',
       '--verbose=TRUE',
     ])
     expect(argv).toEqual(['price', 'BTC', '--verbose'])
@@ -178,5 +177,77 @@ describe('normalizeBooleanFlagValues', () => {
     expect(text).not.toContain('Unknown flag')
     expect(code).toBe(0)
     expect(text).toContain('BTC')
+  })
+
+  test('a space does not treat 1, 0, yes, or no as the flag value', () => {
+    const marketSized = parseCreate(['ETH', 'buy', '--reduce-only', '1', '3000'])
+    expect(marketSized.args).toMatchObject({ coin: 'ETH', side: 'buy', size: '1', price: '3000' })
+    expect(marketSized.options.reduceOnly).toBe(true)
+
+    const droppedPrice = parseCreate(['OP', 'buy', '10', '--reduce-only', '1'])
+    expect(droppedPrice.args).toMatchObject({ coin: 'OP', side: 'buy', size: '10', price: '1' })
+    expect(droppedPrice.options.reduceOnly).toBe(true)
+
+    const flipped = parseCreate(['BTC', 'buy', '1', '--reduce-only', '0'])
+    expect(flipped.args).toMatchObject({ coin: 'BTC', side: 'buy', size: '1', price: '0' })
+    expect(flipped.options.reduceOnly).toBe(true)
+
+    const testnet = Parser.parse(
+      normalizeBooleanFlagValues(['BTC', 'buy', '--testnet', '1', '95000']),
+      {
+        args: createArgs,
+        options: createOptions.extend({ testnet: z.boolean().optional() }),
+        alias,
+      },
+    )
+    expect(testnet.args).toMatchObject({ size: '1', price: '95000' })
+    expect(testnet.options.reduceOnly).toBe(false)
+    expect(testnet.options.testnet).toBe(true)
+
+    const leverage = Parser.parse(
+      normalizeBooleanFlagValues(['position', 'leverage', 'BTC', '--isolated', '1']).slice(2),
+      {
+        args: z.object({ coin: z.string(), leverage: z.coerce.number() }),
+        options: z.object({
+          isolated: z.boolean().default(false),
+          cross: z.boolean().default(false),
+          dryRun: z.boolean().default(false),
+        }),
+      },
+    )
+    expect(leverage.args).toMatchObject({ coin: 'BTC', leverage: 1 })
+    expect(leverage.options.isolated).toBe(true)
+  })
+
+  test('finds the command after a valued global flag', () => {
+    const argv = normalizeBooleanFlagValues([
+      '--format',
+      'json',
+      'order',
+      'create',
+      'BTC',
+      'buy',
+      '0.001',
+      '-r',
+      'false',
+    ])
+    expect(argv).toContain('--no-reduce-only')
+    expect(argv).toContain('json')
+    const parsed = Parser.parse(['BTC', 'buy', '0.001', '--no-reduce-only'], {
+      args: createArgs,
+      options: createOptions,
+      alias,
+    })
+    expect(parsed.args).toMatchObject({ coin: 'BTC', side: 'buy', size: '0.001' })
+    expect(parsed.args.price).toBeUndefined()
+    expect(parsed.options.reduceOnly).toBe(false)
+  })
+
+  test('the last presence flag wins', () => {
+    expect(normalizeBooleanFlagValues(['--testnet', '--testnet', 'false'])).toEqual([])
+    expect(normalizeBooleanFlagValues(['--testnet', 'false', '--testnet'])).toEqual(['--testnet'])
+    expect(normalizeBooleanFlagValues(['-t', '--testnet', 'false'])).toEqual([])
+    expect(normalizeBooleanFlagValues(['--verbose', '--verbose', 'FALSE'])).toEqual([])
+    expect(normalizeBooleanFlagValues(['--testnet=true', '--testnet=false'])).toEqual([])
   })
 })
