@@ -20,5 +20,7 @@ describe('publish manifest', () => {
     expect(pkg.scripts.release).toBe('./scripts/release.sh')
     expect(releaseScript).toContain('npm pkg fix')
     expect(releaseScript).toContain('package.json.bak package.json')
+    expect(releaseScript).not.toContain('trap - EXIT')
+    expect(releaseScript).toContain('git push --follow-tags origin main')
   })
 })
